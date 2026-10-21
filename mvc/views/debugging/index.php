@@ -12,14 +12,18 @@ include(__DIR__."/../header.php");
 //include navigation.php where needed adding variables to help highligh
 //page that you are on
 ?>
-    <div class="container-fluid">
-        <h1>User List</h1>
-        <ul class="well">
-            <?php foreach ($users as $user) { ?>
-                <li><?php echo $user->name; ?> (<?php echo $user->email; ?>)</li>
-            <?php } ?>
-        </ul>
-    </div>
+<ul class="well">
+    <?php foreach ($users as $user): ?>
+        <li>
+            <?= htmlspecialchars($user['Name'], ENT_QUOTES, 'UTF-8') ?>
+            (<?= htmlspecialchars($user['Username'], ENT_QUOTES, 'UTF-8') ?>)
+        </li>
+    <?php endforeach; ?>
+
+    <?php if (empty($users)): ?>
+        <li>No users found.</li>
+    <?php endif; ?>
+</ul>
 <?php
 
 include(__DIR__."/../footer.php");

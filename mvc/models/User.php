@@ -6,8 +6,7 @@ require_once(__DIR__.'/DB.php');
 class User extends DB {
     public $name;
     public $email;
-
-    public function __construct($name, $email) {
+    public function __construct($name = '', $email = '') {
         parent::__construct();
         $this->name = $name;
         $this->email = $email;
@@ -22,8 +21,23 @@ class User extends DB {
     }
 
     public function findAll() {
-        // TODO: Retrieve users for authorized management and bug dropdowns.
-    }
+        $data = [];
+
+        try {
+            $stmt = $this->dbh->prepare(
+                "SELECT Id, Username, RoleID, ProjectId, Password, Name FROM user_details"
+            );
+
+            $stmt->execute();
+
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        } catch(PDOException $e) {
+            echo $e->getMessage();
+        }
+
+        return $data;
+    } // findAll
 
     public function create($data) {
         // TODO: Insert validated user data with a password hash using a prepared statement.

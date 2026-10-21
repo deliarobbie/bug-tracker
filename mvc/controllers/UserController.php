@@ -13,25 +13,16 @@ require_once(__DIR__.'/../models/User.php');
 
 class UserController extends Controller {
     public function index() {
-        
-        //Here is where you would use the database class(es)
-        //to get your users - hard coding for now
+        try {
+            $userModel = new User();
+            $users = $userModel->findAll();
 
-        //also check session values if needed to see if authorized
-        //or logged in.
-        //e.g. $this->session->get("loggedIn");
-        //e.g. $this->session->set("loggedIn",true);
-        //e.g. $this->session->destroy();
-
-        //here you would also user $_POST/$_GET as required
-  
-        $users = [
-            new User('John Doe', 'john@example.com'),
-            new User('Jane Doe', 'jane@example.com')
-        ];
-
-        // TODO: Restrict this development-only sample to authorized Admins.
-        $this->render('debugging/index', ['users' => $users]);
+            $this->render('debugging/index', ['users' => $users]);
+        } catch (PDOException $e) {
+            error_log($e->getMessage());
+            http_response_code(500);
+            echo 'Unable to load users.';
+        }
     }
 
     //create other functions if needed. Should match those set in

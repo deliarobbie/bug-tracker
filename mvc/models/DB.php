@@ -2,14 +2,27 @@
 //This model will represent a user in your application.
 
 class DB {
-    //declare your connection and any other common functions for your models
-
+    protected $dbh;
     public function __construct() {
-        //create your connection
+        try {
+            $this->dbh = new PDO(
+                "mysql:host={$_SERVER['DB_SERVER']};dbname={$_SERVER['DB']}",
+                $_SERVER['DB_USER'],
+                $_SERVER['DB_PASSWORD']
+            );
+
+            $this->dbh->setAttribute(
+                PDO::ATTR_ERRMODE,
+                PDO::ERRMODE_EXCEPTION
+            );
+
+        } catch (PDOException $pe) {
+            echo $pe->getMessage();
+            die("Bad Database");
+        }
     }
 
     protected function getConnection() {
-        // TODO: Return a shared PDO connection configured for Web01.
-        // All model queries must use prepared statements; keep supplied tables unchanged.
+        return $this->dbh;
     }
 }

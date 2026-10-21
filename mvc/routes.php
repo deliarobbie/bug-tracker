@@ -12,6 +12,7 @@ $router = new Router();
 //Add routes here: "path", "Controller", "controllerFunction")
 //default route for system - could be login or something else
 $router->addRoute('/', 'AuthController', 'loginForm');
+$router->addRoute('users', 'UserController', 'index');
 $router->addRoute('login', 'AuthController', 'loginForm');
 $router->addRoute('login-submit', 'AuthController', 'login');
 $router->addRoute('logout', 'AuthController', 'logout');

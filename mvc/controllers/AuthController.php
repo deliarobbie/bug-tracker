@@ -7,7 +7,7 @@ class AuthController extends Controller
 {
     public function loginForm()
     {
-        // TODO: Display the login view.
+        $this->render('auth/login');
     }
 
     public function login()

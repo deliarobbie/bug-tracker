@@ -7,7 +7,7 @@ class Session {
 
     //could take in a parameter for session name
     private function __construct() {
-        session_name("mymvc");
+        session_name("bug-tracker-session");
         session_start();
     }
 
