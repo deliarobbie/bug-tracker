@@ -17,7 +17,11 @@ class User extends DB {
     }
 
     public function findByUsername($username) {
-        // TODO: Retrieve the authentication record using the schema's actual login field.
+        $stmt = $this->dbh->prepare(
+            'SELECT Id, Username, RoleID, ProjectId, Password, Name FROM user_details WHERE Username = :username LIMIT 1'
+        );
+        $stmt->execute(['username' => $username]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     public function findAll() {
@@ -40,7 +44,16 @@ class User extends DB {
     } // findAll
 
     public function create($data) {
-        // TODO: Insert validated user data with a password hash using a prepared statement.
+        $stmt = $this->dbh->prepare(
+            'INSERT INTO user_details (Username, RoleID, ProjectId, Password, Name) VALUES (:username, :role_id, :project_id, :password, :name)'
+        );
+        return $stmt->execute([
+            'username' => $data['username'],
+            'role_id' => $data['role_id'],
+            'project_id' => $data['project_id'] ?? null,
+            'password' => password_hash($data['password'], PASSWORD_DEFAULT),
+            'name' => $data['name'],
+        ]);
     }
 
     public function assignProject($userId, $projectId) {
