@@ -29,12 +29,12 @@ class BugController extends Controller
     {
         require_once __DIR__ . '/../models/Project.php';
         require_once __DIR__ . '/../models/Bug.php';
+        require_once __DIR__ . '/../models/User.php';
         $projectModel = new Project();
         if ($canManage) {
             $projects = $projectModel->findAll();
         } else {
-            $project = !empty($user['ProjectId'])
-                ? $projectModel->findById($user['ProjectId']) : false;
+            $project = $projectModel->findForUser($user['Id']);
             $projects = $project ? [$project] : [];
         }
 

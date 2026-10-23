@@ -14,8 +14,6 @@ class AuthController extends Controller
     {
         $identifier = $_POST['identifier'] ?? '';
         $password = $_POST['password'] ?? '';
-        // var_dump(password_hash($password, PASSWORD_DEFAULT));
-        // exit;
         $identifier = is_string($identifier) ? trim($identifier) : '';
 
         if ($identifier === '' || !is_string($password) || $password === '') {
