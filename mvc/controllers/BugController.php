@@ -25,7 +25,7 @@ class BugController extends Controller
         $this->renderBugPage($user, $canManage, $projectId ?: '');
     }
 
-    private function renderBugPage($user, $canManage, $projectId, $errors = [])
+    private function renderBugPage($user, $canManage, $projectId, $errors = [], $bug = null)
     {
         require_once __DIR__ . '/../models/Project.php';
         require_once __DIR__ . '/../models/Bug.php';
@@ -42,14 +42,14 @@ class BugController extends Controller
         if (!in_array($filter, ['all', 'open', 'overdue'], true)) {
             $filter = 'all';
         }
-        $bugs = (new Bug())->findAllVisibleToUser($user, [
+        $bugs = $bug ? [] : (new Bug())->findAllVisibleToUser($user, [
             'project_id' => $projectId,
             'filter' => $filter,
         ]);
         $priorties = (new Bug())->getPriorities();
         $statuses = (new Bug())->getStatuses();
         $users = (new User())->findAll();
-        $this->render('bugs/index', [
+        $this->render($bug ? 'bugs/details' : 'bugs/index', [
             'currentUser' => $user,
             'canManage' => $canManage,
             'canAssign' => $canManage,
@@ -58,6 +58,7 @@ class BugController extends Controller
             'bugs' => $bugs,
             'filter' => $filter,
             'errors' => $errors,
+            'bug' => $bug,
             'statuses' =>$statuses,
             'priorities' => $priorties,
             'users' => $users
@@ -66,7 +67,19 @@ class BugController extends Controller
 
     public function details()
     {
-        // TODO: Check visibility and load bug details for the bug view.
+        $user = $this->authorizedUser();
+        if (!$user) {
+            return;
+        }
+        try {
+            $bug = $this->loadVisibleBug($user, $_GET['id'] ?? '');
+            if (!$bug) {
+                return;
+            }
+            $this->renderBugPage($user, $this->canManage($user), $bug['ProjectId'], [], $bug);
+        } catch (PDOException $e) {
+            $this->databaseError($e);
+        }
     }
 
     public function create()
@@ -100,42 +113,31 @@ class BugController extends Controller
             'ownerId' => $user['Id'],
             'assignedToId' => null,
             'targetDate' => null,
-            'statusId' => null,
             'priorityId' => null,
             'dateClosed' => null,
             'fixDescription' => null,
         ];
-        if ($canAssign) {
-            foreach (['assigned_to' => 'assignedToId', 'status_id' => 'statusId', 'priority_id' => 'priorityId'] as $field => $key) {
-                $value = $_POST[$field] ?? '';
-                if ($value !== '') {
-                    $data[$key] = $positiveId($value);
-                    if ($data[$key] === false) {
-                        $errors[] = 'Select a valid ' . str_replace('_', ' ', $field) . '.';
-                    }
-                }
-            }
-            $targetDate = $_POST['target_date'] ?? '';
-            if ($targetDate !== '') {
-                $date = is_string($targetDate)
-                    && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $targetDate)
-                    ? DateTimeImmutable::createFromFormat('!Y-m-d', $targetDate) : false;
-                if (!$date || $date->format('Y-m-d') !== $targetDate) {
-                    $errors[] = 'Enter a valid target date.';
-                } else {
-                    $data['targetDate'] = $targetDate;
-                }
+        foreach (['summary' => 250, 'description' => 2500] as $field => $limit) {
+            $value = $_POST[$field] ?? '';
+            $length = is_string($value) ? preg_match_all('/./us', $value) : false;
+            if ($length === false || $length > $limit) {
+                $errors[] = 'Enter a valid ' . $field . ' of at most ' . $limit . ' characters.';
+            } else {
+                $data[$field] = $value;
             }
         }
-
         if (!$errors) {
             require_once __DIR__ . '/../models/Bug.php';
             try {
-                if ((new Bug())->create($data)) {
+                $model = new Bug();
+                $this->validateReferences($model, $data, $errors);
+                if (!$errors && $model->create($data)) {
                     header('Location: ?bugs');
                     return;
                 }
-                $errors[] = 'Unable to create bug.';
+                if (!$errors) {
+                    $errors[] = 'Unable to create bug.';
+                }
             } catch (PDOException $e) {
                 error_log($e->getMessage());
                 $errors[] = 'Unable to create bug. Check the project and assignment selections.';
@@ -148,7 +150,148 @@ class BugController extends Controller
 
     public function update()
     {
-        // TODO: Check access: Users update only assigned bugs; Admins/Managers all bugs. Validate permitted changes.
+        $user = $this->authorizedUser();
+        if (!$user) {
+            return;
+        }
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            return;
+        }
+        try {
+            $bug = $this->loadVisibleBug($user, $_POST['id'] ?? '');
+            if (!$bug) {
+                return;
+            }
+            $canManage = $this->canManage($user);
+            if (!$canManage && (string) $bug['AssignedTo'] !== (string) $user['Id']) {
+                http_response_code(403);
+                echo 'Access denied.';
+                return;
+            }
+            $data = [
+                'assignedToId' => $bug['AssignedTo'],
+                'priorityId' => $bug['PriorityId'],
+                'targetDate' => $bug['TargetDate'],
+                'fixDescription' => $bug['Fix'],
+                'dateClosed' => $bug['ClosureDate'],
+            ];
+            $errors = [];
+            if (array_key_exists('fix', $_POST)) {
+                $fix = $_POST['fix'];
+                $length = is_string($fix) ? preg_match_all('/./us', $fix) : false;
+                if ($length === false || $length > 2500) {
+                    $errors[] = 'Enter a fix description of at most 2,500 characters.';
+                } else {
+                    $data['fixDescription'] = $fix;
+                }
+            }
+            if ($canManage) {
+                foreach (['assigned_to' => 'assignedToId', 'priority_id' => 'priorityId'] as $field => $key) {
+                    if (!array_key_exists($field, $_POST)) {
+                        continue;
+                    }
+                    $value = $_POST[$field];
+                    $data[$key] = $value === '' ? null : filter_var(
+                        $value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]
+                    );
+                    if ($data[$key] === false) {
+                        $errors[] = 'Select a valid ' . str_replace('_', ' ', $field) . '.';
+                    }
+                }
+            }
+            foreach (['closure_date' => 'dateClosed', 'target_date' => 'targetDate'] as $field => $key) {
+                if (($field === 'target_date' && !$canManage) || !array_key_exists($field, $_POST)) {
+                    continue;
+                }
+                $value = $_POST[$field];
+                if ($value === '') {
+                    $data[$key] = null;
+                    continue;
+                }
+                $date = is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value)
+                    ? DateTimeImmutable::createFromFormat('!Y-m-d', $value) : false;
+                if (!$date || $date->format('Y-m-d') !== $value) {
+                    $errors[] = 'Enter a valid ' . str_replace('_', ' ', $field) . '.';
+                } else {
+                    $data[$key] = $value;
+                }
+            }
+            $model = new Bug();
+            if (!$errors) {
+                $this->validateReferences($model, $data, $errors);
+            }
+            if (!$errors) {
+                if ($model->update($bug['Id'], $data)) {
+                    header('Location: ?bug-details&id=' . rawurlencode((string) $bug['Id']));
+                    return;
+                }
+                $errors[] = 'Unable to update bug.';
+            }
+            http_response_code(422);
+            foreach (['assignedToId' => 'AssignedTo', 'priorityId' => 'PriorityId', 'targetDate' => 'TargetDate',
+                      'fixDescription' => 'Fix', 'dateClosed' => 'ClosureDate'] as $key => $alias) {
+                if ($data[$key] !== false) {
+                    $bug[$alias] = $data[$key];
+                }
+            }
+            $this->renderBugPage($user, $canManage, $bug['ProjectId'], $errors, $bug);
+        } catch (PDOException $e) {
+            $this->databaseError($e);
+        }
+    }
+
+    private function canManage($user)
+    {
+        return in_array((int) $user['RoleID'], [1, 2], true);
+    }
+
+    private function authorizedUser()
+    {
+        $user = $this->session->get('user');
+        if (!is_array($user) || empty($user['Id'])
+            || !in_array((int) ($user['RoleID'] ?? 0), [1, 2, 3], true)) {
+            http_response_code(403);
+            echo 'Access denied.';
+            return false;
+        }
+        return $user;
+    }
+
+    private function loadVisibleBug($user, $id)
+    {
+        $id = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        require_once __DIR__ . '/../models/Bug.php';
+        $bug = $id ? (new Bug())->findById($id) : false;
+        if (!$bug) {
+            http_response_code(404);
+            echo 'Bug not found.';
+            return false;
+        }
+        if (!$this->canManage($user)
+            && (string) $bug['ProjectId'] !== (string) ($user['ProjectId'] ?? '')) {
+            http_response_code(403);
+            echo 'Access denied.';
+            return false;
+        }
+        return $bug;
+    }
+
+    private function validateReferences($model, $data, &$errors)
+    {
+        foreach (['projectId' => 'project', 'assignedToId' => 'user_details', 'priorityId' => 'priority'] as $key => $table) {
+            if (isset($data[$key]) && !$model->referenceExists($table, $data[$key])) {
+                $errors[] = 'Select a valid ' . ['projectId' => 'project', 'assignedToId' => 'assignee', 'priorityId' => 'priority'][$key] . '.';
+            }
+        }
+    }
+
+    private function databaseError($e)
+    {
+        error_log($e->getMessage());
+        http_response_code(500);
+        echo 'Unable to load or save bug.';
     }
 
 }

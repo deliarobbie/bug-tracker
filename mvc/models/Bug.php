@@ -43,7 +43,7 @@ class Bug extends DB
         $sort = $filters['sort'] ?? 'id';
         $sortColumn = is_string($sort) ? ($sortColumns[$sort] ?? 'b.id') : 'b.id';
         $direction = strtoupper((string) ($filters['direction'] ?? 'DESC')) === 'ASC' ? 'ASC' : 'DESC';
-        $sql = 'SELECT b.id AS Id, b.projectId AS ProjectId,
+        $sql = 'SELECT b.id AS Id, b.summary AS Summary, b.projectId AS ProjectId,
                        b.statusId AS StatusId, b.priorityId AS PriorityId,
                        b.assignedToId AS AssignedTo, b.targetDate AS TargetDate,
                        s.Status, p.Priority, u.Name AS AssignedToName
@@ -64,7 +64,16 @@ class Bug extends DB
 
     public function findById($id)
     {
-        // TODO: Query bug details; controller must check access.
+        $stmt = $this->dbh->prepare(
+            'SELECT id AS Id, projectId AS ProjectId, assignedToId AS AssignedTo,
+                    statusId AS StatusId, priorityId AS PriorityId, summary AS Summary,
+                    description AS Description, fixDescription AS Fix,
+                    ownerId AS OwnerId, dateRaised AS DateRaised,
+                    targetDate AS TargetDate, dateClosed AS ClosureDate
+             FROM bugs WHERE id = :id'
+        );
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     public function create($data)
@@ -75,7 +84,7 @@ class Bug extends DB
                  description, fixDescription, dateRaised, targetDate, dateClosed)
              VALUES
                 (:projectId, :ownerId, :assignedToId,
-                 COALESCE(:statusId, (SELECT Id FROM bug_status WHERE Status = 'Unassigned')),
+                 :statusId,
                  COALESCE(:priorityId, (SELECT Id FROM priority WHERE Priority = 'Medium')),
                  :summary, :description, NULL, CURRENT_TIMESTAMP, :targetDate, NULL)"
         );
@@ -84,7 +93,7 @@ class Bug extends DB
             'projectId' => $data['projectId'],
             'ownerId' => $data['ownerId'],
             'assignedToId' => ($data['assignedToId'] ?? null) ?: null,
-            'statusId' => ($data['statusId'] ?? null) ?: null,
+            'statusId' => empty($data['assignedToId']) ? 1 : 2,
             'priorityId' => ($data['priorityId'] ?? null) ?: null,
             'summary' => $data['summary'] ?? '',
             'description' => $data['description'] ?? '',
@@ -94,7 +103,30 @@ class Bug extends DB
 
     public function update($id, $data)
     {
-        // TODO: Save authorized validated changes.
+        $stmt = $this->dbh->prepare(
+            'UPDATE bugs SET assignedToId = :assignedToId, statusId = :statusId,
+             priorityId = :priorityId, targetDate = :targetDate,
+             fixDescription = :fixDescription, dateClosed = :dateClosed WHERE id = :id'
+        );
+        return $stmt->execute([
+            'id' => $id,
+            'assignedToId' => $data['assignedToId'],
+            'statusId' => !empty($data['dateClosed']) ? 3 : (empty($data['assignedToId']) ? 1 : 2),
+            'priorityId' => $data['priorityId'],
+            'targetDate' => $data['targetDate'],
+            'fixDescription' => $data['fixDescription'],
+            'dateClosed' => $data['dateClosed'],
+        ]);
+    }
+
+    public function referenceExists($table, $id)
+    {
+        if (!in_array($table, ['project', 'user_details', 'priority'], true)) {
+            throw new InvalidArgumentException('Invalid reference table.');
+        }
+        $stmt = $this->dbh->prepare("SELECT Id FROM $table WHERE Id = :id");
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetchColumn() !== false;
     }
 
     public function getStatuses() {

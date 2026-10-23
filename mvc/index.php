@@ -2,7 +2,9 @@
 
 //entry point of the application - routes are determined by query variables
 $uri = parse_url($_SERVER['REQUEST_URI']);
-$uri = isset($uri['query']) ? $uri['query'] : "/";
+$routeParameters = [];
+parse_str($uri['query'] ?? '', $routeParameters);
+$uri = array_key_first($routeParameters) ?? '/';
 
 require('./routes.php');
 

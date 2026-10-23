@@ -33,6 +33,66 @@
             color: #ccc;
             text-align: center;
         }
+
+        .bug-details-page {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .bug-details-card {
+            padding: 24px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fff;
+            margin-bottom: 24px;
+        }
+
+        .bug-details-card h2 {
+            margin-top: 0;
+            margin-bottom: 24px;
+        }
+
+        .bug-details-list {
+            display: grid;
+            grid-template-columns: 140px minmax(0, 1fr);
+            margin-bottom: 0;
+        }
+
+        .bug-details-list dt,
+        .bug-details-list dd {
+            margin: 0;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+
+        .bug-details-list dt {
+            padding-right: 20px;
+            color: #555;
+        }
+
+        .bug-details-list dd {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .bug-details-list dd:empty::before {
+            content: '\2014';
+            color: #777;
+        }
+
+        .bug-update-form {
+            margin-top: 28px;
+            padding-top: 4px;
+            border-top: 1px solid #ddd;
+        }
+
+        @media (max-width: 480px) {
+            .bug-details-card { padding: 16px; }
+            .bug-details-list { grid-template-columns: minmax(0, 1fr); }
+            .bug-details-list dt { border-bottom: 0; padding-bottom: 4px; }
+            .bug-details-list dd { padding-top: 0; }
+        }
     </style>
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
