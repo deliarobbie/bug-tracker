@@ -61,11 +61,48 @@ class User extends DB {
     }
 
     public function deleteAndClearAssignments($id) {
-        // TODO: Use a transaction to clear assignments and delete the user.
-        // Preserve projects/bugs; resolve reporter references according to the supplied schema.
+        $this->dbh->beginTransaction();
+
+        try {
+            $stmt = $this->dbh->prepare(
+                'SELECT Id FROM user_details WHERE Id <> :id ORDER BY RoleID, Id LIMIT 1 FOR UPDATE'
+            );
+            $stmt->execute(['id' => $id]);
+            $replacementId = $stmt->fetchColumn();
+
+            if ($replacementId === false) {
+                $stmt = $this->dbh->prepare('SELECT id FROM bugs WHERE ownerId = :id LIMIT 1');
+                $stmt->execute(['id' => $id]);
+                if ($stmt->fetchColumn() !== false) {
+                    throw new PDOException('Cannot delete the last user while they own bugs.');
+                }
+            } else {
+                $stmt = $this->dbh->prepare(
+                    'UPDATE bugs SET ownerId = :replacement_id WHERE ownerId = :id'
+                );
+                $stmt->execute(['replacement_id' => $replacementId, 'id' => $id]);
+            }
+
+            $stmt = $this->dbh->prepare('UPDATE bugs SET assignedToId = NULL WHERE assignedToId = :id');
+            $stmt->execute(['id' => $id]);
+
+            $stmt = $this->dbh->prepare('DELETE FROM user_details WHERE Id = :id');
+            $stmt->execute(['id' => $id]);
+            $deleted = $stmt->rowCount() > 0;
+
+            $this->dbh->commit();
+            return $deleted;
+        } catch (Throwable $e) {
+            if ($this->dbh->inTransaction()) {
+                $this->dbh->rollBack();
+            }
+            throw $e;
+        }
     }
 
     public function getRoles() {
-        // TODO: Retrieve the existing roles using a prepared statement.
+        $stmt = $this->dbh->prepare('SELECT Id, Role FROM role ORDER BY Id');
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
