@@ -58,8 +58,10 @@ class AuthController extends Controller
 
     public function logout()
     {
-        // TODO: Destroy the session and redirect to login.
-    }
+        $this->session->destroy();
 
+        header('Location: ?login');
+        exit;
+    }
 }
 

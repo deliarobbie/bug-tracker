@@ -10,7 +10,7 @@ class BugController extends Controller
 {
     public function index()
     {
-        // TODO: Require login; load assigned project and permitted bugs with validated all/open/overdue filters and sorting.
+        $this->render('bugs/index');
     }
 
     public function details()

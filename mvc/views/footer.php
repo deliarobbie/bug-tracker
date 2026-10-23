@@ -1,4 +1,5 @@
-// make a silly little footer
+<footer class="site-footer">
+    <small>&copy; <?= date('Y') ?> Bug Tracker</small>
+</footer>
 </body>
-
 </html>

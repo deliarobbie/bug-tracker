@@ -1,6 +1,7 @@
 <?php
 
 //Contains the main routing logic for your framework.
+require_once __DIR__ . '/utils/Session.php';
 
 class Router {
     protected $routes = [];
@@ -11,6 +12,17 @@ class Router {
 
     public function dispatch($uri) {
 
+        // make sure users are logged in before routing 
+        $publicRoutes = ['/', 'login', 'login-submit'];
+
+        if (!in_array($uri, $publicRoutes, true)) {
+            $user = Session::getInstance()->get('user');
+
+            if (!is_array($user) || empty($user['Id'])) {
+                header('Location: ?login');
+                exit;
+            }
+        }
         if (array_key_exists($uri, $this->routes)) {
             $controller = $this->routes[$uri]['controller'];
             $action = $this->routes[$uri]['action'];
