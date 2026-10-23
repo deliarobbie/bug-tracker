@@ -10,7 +10,6 @@ class AdminController extends Controller
 
         if (!is_array($user)
             || !in_array((int) ($user['RoleID'] ?? 0), [1, 2], true)) {
-            http_response_code(403);
             echo 'Access denied.';
             return;
         }
@@ -23,13 +22,11 @@ class AdminController extends Controller
         $user = $this->session->get('user');
         if (!is_array($user) || (int) ($user['RoleID'] ?? 0) !== 1) //admin 
         {
-            http_response_code(403);
             echo 'Access denied.';
             return;
         }
 
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-            http_response_code(405);
             header('Allow: POST');
             return;
         }
@@ -88,7 +85,6 @@ class AdminController extends Controller
             }
         }
 
-        http_response_code(422);
         $this->renderAdmin($errors);
     }
 
@@ -109,13 +105,11 @@ class AdminController extends Controller
     {
         $user = $this->session->get('user');
         if (!is_array($user) || (int) ($user['RoleID'] ?? 0) !== 1) {
-            http_response_code(403);
             echo 'Access denied.';
             return;
         }
 
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-            http_response_code(405);
             header('Allow: POST');
             return;
         }
@@ -143,7 +137,6 @@ class AdminController extends Controller
             }
         }
 
-        http_response_code(422);
         $this->renderAdmin($errors);
     }
 
@@ -152,13 +145,11 @@ class AdminController extends Controller
         $user = $this->session->get('user');
         if (!is_array($user)
             || !in_array((int) ($user['RoleID'] ?? 0), [1, 2], true)) {
-            http_response_code(403);
             echo 'Access denied.';
             return;
         }
 
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-            http_response_code(405);
             header('Allow: POST');
             return;
         }
@@ -183,13 +174,59 @@ class AdminController extends Controller
             }
         }
 
-        http_response_code(422);
         $this->renderAdmin($errors);
     }
 
     public function updateProject()
     {
-        // TODO: Require Admin/Manager; validate and update project.
+        $user = $this->session->get('user');
+        if (!is_array($user)
+            || !in_array((int) ($user['RoleID'] ?? 0), [1, 2], true)) {
+            echo 'Access denied.';
+            return;
+        }
+
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            header('Allow: POST');
+            return;
+        }
+
+        $id = filter_var(
+            $_POST['id'] ?? '',
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $name = $_POST['name'] ?? '';
+        $name = is_string($name) ? trim($name) : '';
+        $errors = [];
+
+        if ($id === false) {
+            $errors[] = 'Select a valid project.';
+        }
+        $nameLength = function_exists('mb_strlen') ? mb_strlen($name, 'UTF-8') : strlen($name);
+        if ($name === '' || $nameLength > 50) {
+            $errors[] = 'Enter a project name of 1 to 50 characters.';
+        }
+
+        if (!$errors) {
+            require_once __DIR__ . '/../models/Project.php';
+            try {
+                $projectModel = new Project();
+                if (!$projectModel->findById($id)) {
+                    $errors[] = 'Select a valid project.';
+                } elseif ($projectModel->update($id, ['Project' => $name])) {
+                    header('Location: ?admin');
+                    return;
+                } else {
+                    $errors[] = 'Unable to update project.';
+                }
+            } catch (PDOException $e) {
+                error_log($e->getMessage());
+                $errors[] = 'Unable to update project.';
+            }
+        }
+
+        $this->renderAdmin($errors);
     }
 
 }

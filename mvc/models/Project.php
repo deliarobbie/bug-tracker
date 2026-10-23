@@ -57,7 +57,14 @@ class Project extends DB
 
     public function update($id, $data)
     {
-        // TODO: Update validated project fields.
+        $stmt = $this->dbh->prepare(
+            'UPDATE project SET Project = :Project WHERE Id = :id'
+        );
+
+        return $stmt->execute([
+            'Project' => $data['Project'],
+            'id' => $id,
+        ]);
     }
 
 }

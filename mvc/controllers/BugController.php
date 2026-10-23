@@ -13,7 +13,6 @@ class BugController extends Controller
         $user = $this->session->get('user');
         if (!is_array($user)
             || !in_array((int) ($user['RoleID'] ?? 0), [1, 2, 3], true)) {
-            http_response_code(403);
             echo 'Access denied.';
             return;
         }
@@ -88,12 +87,10 @@ class BugController extends Controller
         if (!is_array($user)
             || !in_array((int) ($user['RoleID'] ?? 0), [1, 2, 3], true)
             || empty($user['Id'])) {
-            http_response_code(403);
             echo 'Access denied.';
             return;
         }
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-            http_response_code(405);
             header('Allow: POST');
             return;
         }
@@ -144,7 +141,6 @@ class BugController extends Controller
             }
         }
 
-        http_response_code(422);
         $this->renderBugPage($user, $canAssign, $projectId ?: '', $errors);
     }
 
@@ -155,7 +151,6 @@ class BugController extends Controller
             return;
         }
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-            http_response_code(405);
             header('Allow: POST');
             return;
         }
@@ -166,7 +161,6 @@ class BugController extends Controller
             }
             $canManage = $this->canManage($user);
             if (!$canManage && (string) $bug['AssignedTo'] !== (string) $user['Id']) {
-                http_response_code(403);
                 echo 'Access denied.';
                 return;
             }
@@ -229,7 +223,6 @@ class BugController extends Controller
                 }
                 $errors[] = 'Unable to update bug.';
             }
-            http_response_code(422);
             foreach (['assignedToId' => 'AssignedTo', 'priorityId' => 'PriorityId', 'targetDate' => 'TargetDate',
                       'fixDescription' => 'Fix', 'dateClosed' => 'ClosureDate'] as $key => $alias) {
                 if ($data[$key] !== false) {
@@ -252,7 +245,6 @@ class BugController extends Controller
         $user = $this->session->get('user');
         if (!is_array($user) || empty($user['Id'])
             || !in_array((int) ($user['RoleID'] ?? 0), [1, 2, 3], true)) {
-            http_response_code(403);
             echo 'Access denied.';
             return false;
         }
@@ -265,13 +257,11 @@ class BugController extends Controller
         require_once __DIR__ . '/../models/Bug.php';
         $bug = $id ? (new Bug())->findById($id) : false;
         if (!$bug) {
-            http_response_code(404);
             echo 'Bug not found.';
             return false;
         }
         if (!$this->canManage($user)
             && (string) $bug['ProjectId'] !== (string) ($user['ProjectId'] ?? '')) {
-            http_response_code(403);
             echo 'Access denied.';
             return false;
         }
@@ -290,7 +280,6 @@ class BugController extends Controller
     private function databaseError($e)
     {
         error_log($e->getMessage());
-        http_response_code(500);
         echo 'Unable to load or save bug.';
     }
 
