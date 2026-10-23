@@ -16,7 +16,27 @@ class Bug extends DB
 
     public function create($data)
     {
-        // TODO: Insert validated new bug fields with required defaults.
+        $stmt = $this->dbh->prepare(
+            "INSERT INTO bugs
+                (projectId, ownerId, assignedToId, statusId, priorityId, summary,
+                 description, fixDescription, dateRaised, targetDate, dateClosed)
+             VALUES
+                (:projectId, :ownerId, :assignedToId,
+                 COALESCE(:statusId, (SELECT Id FROM bug_status WHERE Status = 'Unassigned')),
+                 COALESCE(:priorityId, (SELECT Id FROM priority WHERE Priority = 'Medium')),
+                 :summary, :description, NULL, CURRENT_TIMESTAMP, :targetDate, NULL)"
+        );
+
+        return $stmt->execute([
+            'projectId' => $data['projectId'],
+            'ownerId' => $data['ownerId'],
+            'assignedToId' => ($data['assignedToId'] ?? null) ?: null,
+            'statusId' => ($data['statusId'] ?? null) ?: null,
+            'priorityId' => ($data['priorityId'] ?? null) ?: null,
+            'summary' => $data['summary'],
+            'description' => $data['description'],
+            'targetDate' => ($data['targetDate'] ?? null) ?: null,
+        ]);
     }
 
     public function update($id, $data)
