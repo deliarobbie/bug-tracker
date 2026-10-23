@@ -10,7 +10,58 @@ class BugController extends Controller
 {
     public function index()
     {
-        $this->render('bugs/index');
+        $user = $this->session->get('user');
+        if (!is_array($user)
+            || !in_array((int) ($user['RoleID'] ?? 0), [1, 2, 3], true)) {
+            http_response_code(403);
+            echo 'Access denied.';
+            return;
+        }
+
+        $canManage = in_array((int) $user['RoleID'], [1, 2], true);
+        $projectId = $canManage
+            ? filter_var($_GET['project_id'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+            : ($user['ProjectId'] ?? null);
+        $this->renderBugPage($user, $canManage, $projectId ?: '');
+    }
+
+    private function renderBugPage($user, $canManage, $projectId, $errors = [])
+    {
+        require_once __DIR__ . '/../models/Project.php';
+        require_once __DIR__ . '/../models/Bug.php';
+        $projectModel = new Project();
+        if ($canManage) {
+            $projects = $projectModel->findAll();
+        } else {
+            $project = !empty($user['ProjectId'])
+                ? $projectModel->findById($user['ProjectId']) : false;
+            $projects = $project ? [$project] : [];
+        }
+
+        $filter = $_GET['filter'] ?? 'all';
+        if (!in_array($filter, ['all', 'open', 'overdue'], true)) {
+            $filter = 'all';
+        }
+        $bugs = (new Bug())->findAllVisibleToUser($user, [
+            'project_id' => $projectId,
+            'filter' => $filter,
+        ]);
+        $priorties = (new Bug())->getPriorities();
+        $statuses = (new Bug())->getStatuses();
+        $users = (new User())->findAll();
+        $this->render('bugs/index', [
+            'currentUser' => $user,
+            'canManage' => $canManage,
+            'canAssign' => $canManage,
+            'selectedProjectId' => $projectId,
+            'projects' => $projects,
+            'bugs' => $bugs,
+            'filter' => $filter,
+            'errors' => $errors,
+            'statuses' =>$statuses,
+            'priorities' => $priorties,
+            'users' => $users
+        ]);
     }
 
     public function details()
@@ -39,21 +90,14 @@ class BugController extends Controller
             return filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         };
         $projectId = $positiveId($canAssign ? ($_POST['project_id'] ?? '') : ($user['ProjectId'] ?? ''));
-        $summary = is_string($_POST['title'] ?? null) ? trim($_POST['title']) : '';
-        $description = is_string($_POST['description'] ?? null) ? trim($_POST['description']) : '';
         $errors = [];
         if (!$projectId) {
             $errors[] = 'Select a valid project.';
-        }
-        if ($summary === '' || $description === '') {
-            $errors[] = 'Enter a title and description.';
         }
 
         $data = [
             'projectId' => $projectId,
             'ownerId' => $user['Id'],
-            'summary' => $summary,
-            'description' => $description,
             'assignedToId' => null,
             'targetDate' => null,
             'statusId' => null,
@@ -99,13 +143,7 @@ class BugController extends Controller
         }
 
         http_response_code(422);
-        $this->render('bugs/index', [
-            'currentUser' => $user,
-            'canManage' => $canAssign,
-            'canAssign' => $canAssign,
-            'selectedProjectId' => $projectId,
-            'errors' => $errors,
-        ]);
+        $this->renderBugPage($user, $canAssign, $projectId ?: '', $errors);
     }
 
     public function update()

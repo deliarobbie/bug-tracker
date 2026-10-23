@@ -9,6 +9,7 @@
 require_once(__DIR__.'/../utils/Utils.php');
 require_once(__DIR__.'/../Controller.php');
 require_once(__DIR__.'/../models/User.php');
+require_once(__DIR__.'/../models/Project.php');
 //var_dump(__DIR__.'/../models/User.php');die();
 
 class UserController extends Controller {
@@ -16,8 +17,18 @@ class UserController extends Controller {
         try {
             $userModel = new User();
             $users = $userModel->findAll();
+            $currentUser = $this->session->get('user');
+            $project = false;
+            if (is_array($currentUser)
+                && (int) ($currentUser['RoleID'] ?? 0) === 3
+                && !empty($currentUser['Id'])) {
+                $project = (new Project())->findForUser($currentUser['Id']);
+            }
 
-            $this->render('debugging/index', ['users' => $users]);
+            $this->render('debugging/index', [
+                'users' => $users,
+                'project' => $project,
+            ]);
         } catch (PDOException $e) {
             error_log($e->getMessage());
             http_response_code(500);

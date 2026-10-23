@@ -20,11 +20,11 @@ include __DIR__ . '/../navigation.php';
     $filter = $filter ?? 'all';
     $projectNames = [];
     foreach ($projects as $project) {
-        $projectNames[$project['Id']] = $project['Name'];
+        $projectNames[$project['Id']] = $project['Project'];
     }
     $userNames = [];
     foreach ($users as $user) {
-        $userNames[$user['Id']] = $user['Name'];
+        $userNames[$user['Id']] = $user['Username'];
     }
     $statusNames = [];
     foreach ($statuses as $status) {
@@ -68,19 +68,18 @@ include __DIR__ . '/../navigation.php';
         <h2 id="bug-list-heading">Bugs</h2>
         <div class="table-responsive">
             <table class="table table-striped">
-                <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Project</th><th scope="col">Status</th><th scope="col">Priority</th><th scope="col">Assigned to</th><th scope="col">Target date</th></tr></thead>
+                <thead><tr><th scope="col">ID</th><th scope="col">Project</th><th scope="col">Status</th><th scope="col">Priority</th><th scope="col">Assigned to</th><th scope="col">Target date</th></tr></thead>
                 <tbody>
                     <?php if (empty($bugs)): ?>
-                        <tr><td colspan="7">No bugs found.</td></tr>
+                        <tr><td colspan="6">No bugs found.</td></tr>
                     <?php endif; ?>
                     <?php foreach ($bugs as $item): ?>
                         <tr>
                             <td><a href="<?= $escape('?bug-details&id=' . rawurlencode((string) $item['Id'])) ?>"><?= $escape($item['Id']) ?></a></td>
-                            <td><?= $escape($item['Title'] ?? '') ?></td>
                             <td><?= $escape($projectNames[$item['ProjectId'] ?? ''] ?? '') ?></td>
                             <td><?= $escape($statusNames[$item['StatusId'] ?? ''] ?? $item['Status'] ?? '') ?></td>
                             <td><?= $escape($priorityNames[$item['PriorityId'] ?? ''] ?? $item['Priority'] ?? '') ?></td>
-                            <td><?= $escape($userNames[$item['AssignedTo'] ?? ''] ?? 'Unassigned') ?></td>
+                            <td><?= $escape($userNames[$item['AssignedTo'] ?? ''] ?? $item['AssignedToName'] ?? 'Unassigned') ?></td>
                             <td><?= $escape($item['TargetDate'] ?? '') ?></td>
                         </tr>
                     <?php endforeach; ?>
@@ -105,14 +104,6 @@ include __DIR__ . '/../navigation.php';
             <?php else: ?>
                 <input type="hidden" name="project_id" value="<?= $escape($selectedProjectId) ?>">
             <?php endif; ?>
-            <div class="form-group">
-                <label for="new-title">Title</label>
-                <input class="form-control" id="new-title" name="title" type="text" required>
-            </div>
-            <div class="form-group">
-                <label for="new-description">Description</label>
-                <textarea class="form-control" id="new-description" name="description" rows="4" required></textarea>
-            </div>
             <?php if ($canAssign): ?>
                 <?php foreach (['assigned_to' => ['Assigned to', $userNames], 'status_id' => ['Status', $statusNames], 'priority_id' => ['Priority', $priorityNames]] as $field => $settings): ?>
                     <div class="form-group">
@@ -138,9 +129,9 @@ include __DIR__ . '/../navigation.php';
 
     <?php if (!empty($bug)): ?>
         <section aria-labelledby="bug-details-heading">
-            <h2 id="bug-details-heading">Bug details: <?= $escape($bug['Title'] ?? '') ?></h2>
+            <h2 id="bug-details-heading">Bug details</h2>
             <dl class="dl-horizontal">
-                <?php foreach (['Id' => 'ID', 'Description' => 'Description', 'TargetDate' => 'Target date', 'ClosureDate' => 'Closure date', 'Fix' => 'Fix'] as $field => $label): ?>
+                <?php foreach (['Id' => 'ID', 'TargetDate' => 'Target date', 'ClosureDate' => 'Closure date', 'Fix' => 'Fix'] as $field => $label): ?>
                     <dt><?= $escape($label) ?></dt><dd style="white-space: pre-wrap"><?= $escape($bug[$field] ?? '') ?></dd>
                 <?php endforeach; ?>
                 <dt>Project</dt><dd><?= $escape($projectNames[$bug['ProjectId'] ?? ''] ?? '') ?></dd>
@@ -152,7 +143,7 @@ include __DIR__ . '/../navigation.php';
                 <h3>Update bug</h3>
                 <form action="?bug-update" method="post">
                     <input type="hidden" name="id" value="<?= $escape($bug['Id']) ?>">
-                    <?php foreach (['title' => ['Title', 'Title'], 'description' => ['Description', 'Description'], 'fix' => ['Fix', 'Fix']] as $field => $settings): ?>
+                    <?php foreach (['fix' => ['Fix', 'Fix']] as $field => $settings): ?>
                         <div class="form-group">
                             <label for="update-<?= $escape($field) ?>"><?= $escape($settings[0]) ?></label>
                             <textarea class="form-control" id="update-<?= $escape($field) ?>" name="<?= $escape($field) ?>" rows="3" <?= $field !== 'fix' ? 'required' : '' ?>><?= $escape($bug[$settings[1]] ?? '') ?></textarea>

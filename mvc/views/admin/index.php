@@ -20,7 +20,7 @@ include __DIR__ . '/../navigation.php';
     }
     $projectNames = [];
     foreach ($projects as $project) {
-        $projectNames[$project['Id']] = $project['Name'];
+        $projectNames[$project['Id']] = $project['Project'];
     }
     ?>
     <?php if (!empty($errors)): ?>
@@ -39,11 +39,7 @@ include __DIR__ . '/../navigation.php';
         <form action="?project-create" method="post">
             <div class="form-group">
                 <label for="project-name">Name</label>
-                <input class="form-control" id="project-name" name="name" type="text" required>
-            </div>
-            <div class="form-group">
-                <label for="project-description">Description</label>
-                <textarea class="form-control" id="project-description" name="description" rows="3"></textarea>
+                <input class="form-control" id="project-name" name="name" type="text" maxlength="50" required>
             </div>
             <button class="btn btn-primary" type="submit">Create project</button>
         </form>
@@ -58,12 +54,7 @@ include __DIR__ . '/../navigation.php';
                 <div class="form-group">
                     <label for="project-name-<?= $escape($index) ?>">Name</label>
                     <input class="form-control" id="project-name-<?= $escape($index) ?>" name="name"
-                           type="text" value="<?= $escape($project['Name'] ?? '') ?>" required>
-                </div>
-                <div class="form-group">
-                    <label for="project-description-<?= $escape($index) ?>">Description</label>
-                    <textarea class="form-control" id="project-description-<?= $escape($index) ?>"
-                              name="description" rows="3"><?= $escape($project['Description'] ?? '') ?></textarea>
+                           type="text" value="<?= $escape($project['Project'] ?? '') ?>" maxlength="50" required>
                 </div>
                 <button class="btn btn-default" type="submit">Update project</button>
             </form>

@@ -95,11 +95,13 @@ class AdminController extends Controller
     private function renderAdmin($errors = [])
     {
         require_once __DIR__ . '/../models/User.php';
+        require_once __DIR__ . '/../models/Project.php';
         $this->render('admin/index', [
             'currentUser' => $this->session->get('user'),
             'roles' => (new User())->getRoles(),
             'allUsers' => (new User())->findAll(),
             'errors' => $errors,
+            'projects' => (new Project())->findAll()
         ]);
     }
 
@@ -147,7 +149,42 @@ class AdminController extends Controller
 
     public function createProject()
     {
-        // TODO: Require Admin/Manager; validate and create project.
+        $user = $this->session->get('user');
+        if (!is_array($user)
+            || !in_array((int) ($user['RoleID'] ?? 0), [1, 2], true)) {
+            http_response_code(403);
+            echo 'Access denied.';
+            return;
+        }
+
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            return;
+        }
+
+        $name = $_POST['name'] ?? '';
+        $name = is_string($name) ? trim($name) : '';
+        $errors = [];
+
+        if ($name === '') {
+            $errors[] = 'Enter a project name.';
+        } else {
+            require_once __DIR__ . '/../models/Project.php';
+            try {
+                if ((new Project())->create(['Project' => $name])) {
+                    header('Location: ?admin');
+                    return;
+                }
+                $errors[] = 'Unable to create project.';
+            } catch (PDOException $e) {
+                error_log($e->getMessage());
+                $errors[] = 'Unable to create project.';
+            }
+        }
+
+        http_response_code(422);
+        $this->renderAdmin($errors);
     }
 
     public function updateProject()
