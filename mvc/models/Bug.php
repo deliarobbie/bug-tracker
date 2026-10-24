@@ -53,9 +53,9 @@ class Bug extends DB
             'target_date' => 'bugs.targetDate',
             'date_raised' => 'bugs.dateRaised',
         ];
-        $sort = Utils::bugSort(Utils::value($filters, 'sort', 'id'));
+        $sort = Utils::bugSort(Utils::value($filters, 'sort'));
         $sortColumn = $sortColumns[$sort];
-        $direction = Utils::sortDirection(Utils::value($filters, 'direction', 'DESC'));
+        $direction = Utils::sortDirection('ASC'); // oldest first
         $sql = 'SELECT bugs.id, bugs.summary, bugs.projectId,
                        bugs.statusId, bugs.priorityId,
                        bugs.assignedToId, bugs.targetDate,
@@ -98,7 +98,7 @@ class Bug extends DB
              VALUES
                 (:projectId, :ownerId, :assignedToId,
                  :statusId,
-                 COALESCE(:priorityId, (SELECT Id FROM priority WHERE Priority = 'Medium')),
+                 :priorityId,
                  :summary, :description, NULL, CURRENT_TIMESTAMP, :targetDate, NULL)"
         );
 
@@ -113,6 +113,19 @@ class Bug extends DB
         $priorityId = null;
         if (!empty($data['priorityId'])) {
             $priorityId = $data['priorityId'];
+        }
+        if ($priorityId === null) {
+            // use medium priority when no priority was supplied
+            $priorityStmt = $this->dbh->prepare(
+                'SELECT Id FROM priority WHERE Priority = :priority'
+            );
+            // runs with 'Medium' and if not found throws exception
+            $priorityStmt->execute(['priority' => 'Medium']);
+            $priorityId = $priorityStmt->fetchColumn();
+
+            if ($priorityId === false) {
+                throw new PDOException('Medium priority was not found.');
+            }
         }
         $summary = '';
         if (isset($data['summary'])) {

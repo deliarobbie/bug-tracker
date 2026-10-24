@@ -15,8 +15,16 @@ if (!isset($title)) {
         'UTF-8'
     ) ?></title>
 
+    <!-- i did use AI to help me with front end and styling -->
+    <!-- chatgpt: 
+     "style all of the views. 
+     do not change any code or functionality of the program at all, 
+     simply apply styles to make it look nice"
+    -->
+    Temporarily disabled external styles. Remove this comment wrapper to restore.
     <link rel="stylesheet"
           href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+   
 
     <style>
         body {
@@ -100,7 +108,5 @@ if (!isset($title)) {
         }
     </style>
 
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
 </head>
 <body>

@@ -5,14 +5,14 @@ class Session {
     // Hold the class instance.
     private static $instance = null;
 
-    //could take in a parameter for session name
     private function __construct() {
+        // sets the session name and starts
         session_name("bug-tracker-session");
         session_start();
     }
 
-    //could take in a parameter for session name
     public static function getInstance() {
+        // creates the session instance and returns it
         if (self::$instance == null)
         {
             self::$instance = new Session();
@@ -22,6 +22,7 @@ class Session {
     }
 
     function get($name) {
+        // gets a session value, or returns an empty string if not set
         if (isset($_SESSION[$name])) {
             return $_SESSION[$name];
         }
@@ -30,6 +31,7 @@ class Session {
     }
 
     function set($name, $value) {
+        // stores a session value
         if ($name !== "" && isset($value)) {
             $_SESSION[$name] = $value;
         }
