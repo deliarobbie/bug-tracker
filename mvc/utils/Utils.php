@@ -76,13 +76,6 @@ class Utils
     {
         return self::validDate($value) && $value > date('Y-m-d');
     }
-
-    // checks the request uses POST
-    public static function isPost()
-    {
-        return self::value($_SERVER, 'REQUEST_METHOD') === 'POST';
-    }
-
     // returns an allowed bug filter
     public static function bugFilter($value)
     {

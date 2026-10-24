@@ -94,7 +94,7 @@ class BugController extends Controller
             if (!$bug) {
                 return;
             }
-            $this->renderBugPage($user, Authorization::canAssignBugs($user), $bug['projectId'], [], $bug);
+            $this->renderBugPage($user, Authorization::canAssignBugs($user), $bug['ProjectId'], [], $bug);
         } catch (PDOException $e) {
             $this->databaseError($e);
         }
@@ -169,18 +169,19 @@ class BugController extends Controller
                 Utils::validateReferences($model, $data, $errors);
             }
             if (!$errors) {
-                if ($model->update($bug['id'], $data)) {
-                    header('Location: ?bug-details&id=' . rawurlencode((string) $bug['id']));
+                if ($model->update($bug['Id'], $data)) {
+                    header('Location: ?bug-details&id=' . rawurlencode((string) $bug['Id']));
                     return;
                 }
                 $errors[] = 'Unable to update bug.';
             }
-            foreach (['assignedToId', 'priorityId', 'targetDate', 'fixDescription', 'dateClosed'] as $field) {
-                if ($data[$field] !== false) {
-                    $bug[$field] = $data[$field];
+            foreach (['assignedToId' => 'AssignedTo', 'priorityId' => 'PriorityId', 'targetDate' => 'TargetDate',
+                      'fixDescription' => 'Fix', 'dateClosed' => 'ClosureDate'] as $key => $alias) {
+                if ($data[$key] !== false) {
+                    $bug[$alias] = $data[$key];
                 }
             }
-            $this->renderBugPage($user, $canManage, $bug['projectId'], $errors, $bug);
+            $this->renderBugPage($user, $canManage, $bug['ProjectId'], $errors, $bug);
         } catch (PDOException $e) {
             $this->databaseError($e);
         }

@@ -72,6 +72,11 @@ class AdminController extends Controller
             return;
         }
 
+        if (!Utils::isPost()) {
+            header('Allow: POST');
+            return;
+        }
+
         $errors = Utils::validateId(Utils::value($_POST, 'id'), 'user', $id);
         if (!$errors) {
             require_once __DIR__ . '/../models/User.php';
