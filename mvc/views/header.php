@@ -21,7 +21,6 @@ if (!isset($title)) {
      do not change any code or functionality of the program at all, 
      simply apply styles to make it look nice"
     -->
-    Temporarily disabled external styles. Remove this comment wrapper to restore.
     <link rel="stylesheet"
           href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
    

@@ -45,17 +45,6 @@ class Bug extends DB
             $where[] = 'bugs.targetDate < CURRENT_TIMESTAMP';
         }
 
-        $sortColumns = [
-            'id' => 'bugs.id',
-            'project_id' => 'bugs.projectId',
-            'status_id' => 'bugs.statusId',
-            'priority_id' => 'bugs.priorityId',
-            'target_date' => 'bugs.targetDate',
-            'date_raised' => 'bugs.dateRaised',
-        ];
-        $sort = Utils::bugSort(Utils::value($filters, 'sort'));
-        $sortColumn = $sortColumns[$sort];
-        $direction = Utils::sortDirection('ASC'); // oldest first
         $sql = 'SELECT bugs.id, bugs.summary, bugs.projectId,
                        bugs.statusId, bugs.priorityId,
                        bugs.assignedToId, bugs.targetDate,
@@ -67,7 +56,7 @@ class Bug extends DB
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY ' . $sortColumn . ' ' . $direction;
+        $sql .= ' ORDER BY bugs.projectId ASC, bugs.id ASC';
 
         $stmt = $this->dbh->prepare($sql);
         $stmt->execute($params);

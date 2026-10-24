@@ -179,31 +179,66 @@ include __DIR__ . '/../navigation.php';
 
     <section aria-labelledby="create-bug-heading">
         <h2 id="create-bug-heading">Create bug</h2>
+        <?php
+        $creationProjectId = $selectedProjectId;
+        if ($canAssign && isset($_POST['project_id'])) {
+            $creationProjectId = Utils::stringValue($_POST, 'project_id');
+        }
+        $submittedAssignee = Utils::stringValue($_POST, 'assigned_to');
+        $submittedPriority = Utils::stringValue($_POST, 'priority_id');
+        $submittedTargetDate = Utils::stringValue($_POST, 'target_date');
+        ?>
         <form action="?bug-create" method="post">
             <div class="form-group">
-                <label for="new-summary">Summary (optional)</label>
+                <label for="new-summary">Summary</label>
                 <?php
                 $submittedSummary = Utils::stringValue($_POST, 'summary');
                 ?>
-                <input class="form-control" id="new-summary" name="summary" type="text" maxlength="250" value="<?= $escape($submittedSummary) ?>">
+                <input class="form-control" id="new-summary" name="summary" type="text" maxlength="250" required value="<?= $escape($submittedSummary) ?>">
             </div>
             <div class="form-group">
-                <label for="new-description">Description (optional)</label>
+                <label for="new-description">Description</label>
                 <?php
                 $submittedDescription = Utils::stringValue($_POST, 'description');
                 ?>
-                <textarea class="form-control" id="new-description" name="description" rows="5" maxlength="2500"><?= $escape($submittedDescription) ?></textarea>
+                <textarea class="form-control" id="new-description" name="description" rows="5" maxlength="2500" required><?= $escape($submittedDescription) ?></textarea>
             </div>
             <div class="form-group">
                 <label for="new-project">Project</label>
                 <select class="form-control" id="new-project" name="project_id" required>
                     <option value="">Select a project</option>
                     <?php foreach ($projectNames as $id => $name): ?>
-                        <option value="<?= $escape($id) ?>" <?php if ((string) $selectedProjectId === (string) $id): ?>selected<?php endif; ?>><?= $escape($name) ?></option>
+                        <option value="<?= $escape($id) ?>" <?php if ((string) $creationProjectId === (string) $id): ?>selected<?php endif; ?>><?= $escape($name) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
-            <p>New bugs are unassigned with medium priority and no target date.</p>
+            <?php if ($canAssign): ?>
+                <div class="form-group">
+                    <label for="new-assignee">Assigned to</label>
+                    <select class="form-control" id="new-assignee" name="assigned_to">
+                        <option value="">Unassigned</option>
+                        <?php foreach ($userNames as $id => $name): ?>
+                            <option value="<?= $escape($id) ?>" <?php if ((string) $submittedAssignee === (string) $id): ?>selected<?php endif; ?>><?= $escape($name) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="new-priority">Priority</label>
+                    <select class="form-control" id="new-priority" name="priority_id">
+                        <option value="">Medium (default)</option>
+                        <?php foreach ($priorityNames as $id => $name): ?>
+                            <option value="<?= $escape($id) ?>" <?php if ((string) $submittedPriority === (string) $id): ?>selected<?php endif; ?>><?= $escape($name) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="new-target-date">Target date (optional)</label>
+                    <input class="form-control" id="new-target-date" name="target_date" type="date" value="<?= $escape($submittedTargetDate) ?>">
+                </div>
+                <p>You may assign the bug, choose a priority, and set a future target date. Blank priority defaults to Medium.</p>
+            <?php else: ?>
+                <p>New bugs are unassigned with medium priority and no target date.</p>
+            <?php endif; ?>
             <button class="btn btn-primary" type="submit">Create bug</button>
         </form>
     </section>

@@ -40,6 +40,16 @@ class Utils
         $length = preg_match_all('/./us', $value);
         return $length !== false && $length <= $maxLength;
     }
+    // checks bug text uses letters, numbers, whitespace, and common punctuation
+    public static function validBugText($value, $maxLength)
+    {
+        if (!self::validText($value, $maxLength)) {
+            return false;
+        }
+
+        return preg_match('/\A[\p{L}\p{M}\p{N} \t\r\n.,\x{0027}’"“”\-–—()?!:;\/]*\z/u', $value) === 1;
+    }
+
     // returns a positive integer, or false if invalid
     public static function parseId($value)
     {
@@ -264,13 +274,40 @@ class Utils
         }
 
         if (!self::required($data['summary'])
-            || !self::validText($data['summary'], 250)) {
-            $errors[] = 'Enter a summary of 1 to 250 characters.';
+            || !self::validBugText($data['summary'], 250)) {
+            $errors[] = 'Enter a summary of 1 to 250 characters using letters, numbers, whitespace, and common punctuation.';
         }
 
         if (!self::required($data['description'])
-            || !self::validText($data['description'], 2500)) {
-            $errors[] = 'Enter a description of 1 to 2500 characters.';
+            || !self::validBugText($data['description'], 2500)) {
+            $errors[] = 'Enter a description of 1 to 2500 characters using letters, numbers, whitespace, and common punctuation.';
+        }
+
+        if (Authorization::canAssignBugs($user)) {
+            $assignedTo = self::value($input, 'assigned_to');
+            if ($assignedTo !== '') {
+                $data['assignedToId'] = self::parseId($assignedTo);
+                if ($data['assignedToId'] === false) {
+                    $errors[] = 'Select a valid assignee.';
+                }
+            }
+
+            $priority = self::value($input, 'priority_id');
+            if ($priority !== '') {
+                $data['priorityId'] = self::parseId($priority);
+                if ($data['priorityId'] === false) {
+                    $errors[] = 'Select a valid priority.';
+                }
+            }
+
+            $targetDate = self::value($input, 'target_date');
+            if ($targetDate !== '') {
+                if (!self::futureDate($targetDate)) {
+                    $errors[] = 'Enter a target date in the future.';
+                } else {
+                    $data['targetDate'] = $targetDate;
+                }
+            }
         }
 
         return $errors;
@@ -290,8 +327,8 @@ class Utils
         $errors = [];
 
         if (array_key_exists('fix', $input)) {
-            if (!self::validText($input['fix'], 2500)) {
-                $errors[] = 'Enter a fix description of at most 2,500 characters.';
+            if (!self::validBugText($input['fix'], 2500)) {
+                $errors[] = 'Enter a fix description of at most 2,500 characters using letters, numbers, whitespace, and common punctuation.';
             } else {
                 $data['fixDescription'] = $input['fix'];
             }
