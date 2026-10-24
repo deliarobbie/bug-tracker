@@ -1,56 +1,69 @@
 <?php
 
 require_once __DIR__ . '/DB.php';
-// considers user role, filtering, owners, assignments, statuses, etc.  b
+require_once __DIR__ . '/../utils/Authorization.php';
+require_once __DIR__ . '/../utils/Utils.php';
+// Retrieves and saves bugs using the database schema.
 class Bug extends DB
 {
     public function findAllVisibleToUser($user, $filters = [])
     {
-        $roleId = (int) ($user['RoleID'] ?? 0);
-        if (!in_array($roleId, [1, 2, 3], true)) {
+        if (!Authorization::canAccessBugs($user)) {
             return [];
         }
+        $canManage = Authorization::canAssignBugs($user);
 
         $where = [];
         $params = [];
-        $projectId = $roleId === 3
-            ? ($user['ProjectId'] ?? null) : ($filters['project_id'] ?? null);
-        if ($roleId === 3 || ($projectId !== null && $projectId !== '')) {
-            $projectId = filter_var($projectId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if (!$canManage) {
+            if (isset($user['ProjectId'])) {
+                $projectId = $user['ProjectId'];
+            } else {
+                $projectId = null;
+            }
+        } else {
+            if (isset($filters['project_id'])) {
+                $projectId = $filters['project_id'];
+            } else {
+                $projectId = null;
+            }
+        }
+        if (!$canManage || ($projectId !== null && $projectId !== '')) {
+            $projectId = Utils::parseId($projectId);
             if ($projectId === false) {
                 return [];
             }
-            $where[] = 'b.projectId = :projectId';
+            $where[] = 'bugs.projectId = :projectId';
             $params['projectId'] = $projectId;
         }
 
-        $filter = $filters['filter'] ?? 'all';
+        $filter = Utils::bugFilter(Utils::value($filters, 'filter', 'all'));
         if (in_array($filter, ['open', 'overdue'], true)) {
-            $where[] = 'b.dateClosed IS NULL';
+            $where[] = 'bugs.dateClosed IS NULL';
         }
         if ($filter === 'overdue') {
-            $where[] = 'b.targetDate < CURRENT_TIMESTAMP';
+            $where[] = 'bugs.targetDate < CURRENT_TIMESTAMP';
         }
 
         $sortColumns = [
-            'id' => 'b.id',
-            'project_id' => 'b.projectId',
-            'status_id' => 'b.statusId',
-            'priority_id' => 'b.priorityId',
-            'target_date' => 'b.targetDate',
-            'date_raised' => 'b.dateRaised',
+            'id' => 'bugs.id',
+            'project_id' => 'bugs.projectId',
+            'status_id' => 'bugs.statusId',
+            'priority_id' => 'bugs.priorityId',
+            'target_date' => 'bugs.targetDate',
+            'date_raised' => 'bugs.dateRaised',
         ];
-        $sort = $filters['sort'] ?? 'id';
-        $sortColumn = is_string($sort) ? ($sortColumns[$sort] ?? 'b.id') : 'b.id';
-        $direction = strtoupper((string) ($filters['direction'] ?? 'DESC')) === 'ASC' ? 'ASC' : 'DESC';
-        $sql = 'SELECT b.id AS Id, b.summary AS Summary, b.projectId AS ProjectId,
-                       b.statusId AS StatusId, b.priorityId AS PriorityId,
-                       b.assignedToId AS AssignedTo, b.targetDate AS TargetDate,
-                       s.Status, p.Priority, u.Name AS AssignedToName
-                FROM bugs b
-                LEFT JOIN bug_status s ON s.Id = b.statusId
-                LEFT JOIN priority p ON p.Id = b.priorityId
-                LEFT JOIN user_details u ON u.Id = b.assignedToId';
+        $sort = Utils::bugSort(Utils::value($filters, 'sort', 'id'));
+        $sortColumn = $sortColumns[$sort];
+        $direction = Utils::sortDirection(Utils::value($filters, 'direction', 'DESC'));
+        $sql = 'SELECT bugs.id, bugs.summary, bugs.projectId,
+                       bugs.statusId, bugs.priorityId,
+                       bugs.assignedToId, bugs.targetDate,
+                       bug_status.Status, priority.Priority, user_details.Name
+                FROM bugs
+                LEFT JOIN bug_status ON bug_status.Id = bugs.statusId
+                LEFT JOIN priority ON priority.Id = bugs.priorityId
+                LEFT JOIN user_details ON user_details.Id = bugs.assignedToId';
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
@@ -65,11 +78,11 @@ class Bug extends DB
     public function findById($id)
     {
         $stmt = $this->dbh->prepare(
-            'SELECT id AS Id, projectId AS ProjectId, assignedToId AS AssignedTo,
-                    statusId AS StatusId, priorityId AS PriorityId, summary AS Summary,
-                    description AS Description, fixDescription AS Fix,
-                    ownerId AS OwnerId, dateRaised AS DateRaised,
-                    targetDate AS TargetDate, dateClosed AS ClosureDate
+            'SELECT id, projectId, assignedToId,
+                    statusId, priorityId, summary,
+                    description, fixDescription,
+                    ownerId, dateRaised,
+                    targetDate, dateClosed
              FROM bugs WHERE id = :id'
         );
         $stmt->execute(['id' => $id]);
@@ -89,20 +102,52 @@ class Bug extends DB
                  :summary, :description, NULL, CURRENT_TIMESTAMP, :targetDate, NULL)"
         );
 
+        $assignedToId = null;
+        if (!empty($data['assignedToId'])) {
+            $assignedToId = $data['assignedToId'];
+        }
+        $statusId = 2;
+        if (empty($data['assignedToId'])) {
+            $statusId = 1;
+        }
+        $priorityId = null;
+        if (!empty($data['priorityId'])) {
+            $priorityId = $data['priorityId'];
+        }
+        $summary = '';
+        if (isset($data['summary'])) {
+            $summary = $data['summary'];
+        }
+        $description = '';
+        if (isset($data['description'])) {
+            $description = $data['description'];
+        }
+        $targetDate = null;
+        if (!empty($data['targetDate'])) {
+            $targetDate = $data['targetDate'];
+        }
+
         return $stmt->execute([
             'projectId' => $data['projectId'],
             'ownerId' => $data['ownerId'],
-            'assignedToId' => ($data['assignedToId'] ?? null) ?: null,
-            'statusId' => empty($data['assignedToId']) ? 1 : 2,
-            'priorityId' => ($data['priorityId'] ?? null) ?: null,
-            'summary' => $data['summary'] ?? '',
-            'description' => $data['description'] ?? '',
-            'targetDate' => ($data['targetDate'] ?? null) ?: null,
+            'assignedToId' => $assignedToId,
+            'statusId' => $statusId,
+            'priorityId' => $priorityId,
+            'summary' => $summary,
+            'description' => $description,
+            'targetDate' => $targetDate,
         ]);
     }
 
     public function update($id, $data)
     {
+        $statusId = 1;
+        if (!empty($data['dateClosed'])) {
+            $statusId = 3;
+        } elseif (!empty($data['assignedToId'])) {
+            $statusId = 2;
+        }
+
         $stmt = $this->dbh->prepare(
             'UPDATE bugs SET assignedToId = :assignedToId, statusId = :statusId,
              priorityId = :priorityId, targetDate = :targetDate,
@@ -111,7 +156,7 @@ class Bug extends DB
         return $stmt->execute([
             'id' => $id,
             'assignedToId' => $data['assignedToId'],
-            'statusId' => !empty($data['dateClosed']) ? 3 : (empty($data['assignedToId']) ? 1 : 2),
+            'statusId' => $statusId,
             'priorityId' => $data['priorityId'],
             'targetDate' => $data['targetDate'],
             'fixDescription' => $data['fixDescription'],
@@ -168,4 +213,4 @@ class Bug extends DB
     } // findAll
 }
 
- 
+

@@ -1,6 +1,8 @@
 <?php
 
 require_once(__DIR__.'/utils/Session.php');
+require_once __DIR__ . '/utils/Authorization.php';
+require_once __DIR__ . '/utils/Utils.php';
 
 //The base controller class that all other controllers will extend
 class Controller {
@@ -14,10 +16,10 @@ class Controller {
 
     protected function render($view, $data = []) {
         extract($data);
-        
+
         include("./views/$view.php");
     }
     protected function redirect($route) {
         // TODO: Redirect to an internal application route and end processing.
     }
-}   
+}

@@ -37,7 +37,7 @@ class Project extends DB
     public function findForUser($userId)
     {
         $stmt = $this->dbh->prepare(
-            'SELECT p.Id, p.Project FROM project p INNER JOIN user_details u ON u.ProjectId = p.Id WHERE u.Id = :userId'
+            'SELECT project.Id, project.Project FROM project INNER JOIN user_details ON user_details.ProjectId = project.Id WHERE user_details.Id = :userId'
         );
         $stmt->execute(['userId' => $userId]);
 

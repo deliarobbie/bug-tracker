@@ -1,6 +1,6 @@
 <?php
 //This model will represent a user in your application.
-// retrieves, creates, updates projects for users 
+// retrieves, creates, updates projects for users
 require_once(__DIR__.'/DB.php');
 
 class User extends DB {
@@ -47,10 +47,14 @@ class User extends DB {
         $stmt = $this->dbh->prepare(
             'INSERT INTO user_details (Username, RoleID, ProjectId, Password, Name) VALUES (:username, :role_id, :project_id, :password, :name)'
         );
+        $projectId = null;
+        if (isset($data['project_id'])) {
+            $projectId = $data['project_id'];
+        }
         return $stmt->execute([
             'username' => $data['username'],
             'role_id' => $data['role_id'],
-            'project_id' => $data['project_id'] ?? null,
+            'project_id' => $projectId,
             'password' => password_hash($data['password'], PASSWORD_DEFAULT),
             'name' => $data['name'],
         ]);

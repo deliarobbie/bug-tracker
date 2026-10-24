@@ -12,13 +12,13 @@ class AuthController extends Controller
 
     public function login()
     {
-        $identifier = $_POST['identifier'] ?? '';
-        $password = $_POST['password'] ?? '';
-        $identifier = is_string($identifier) ? trim($identifier) : '';
+        $errors = Utils::validateLogin($_POST, $data);
+        $identifier = $data['identifier'];
+        $password = $data['password'];
 
-        if ($identifier === '' || !is_string($password) || $password === '') {
+        if ($errors) {
             $this->render('auth/login', [
-                'errors' => ['Enter your login identifier and password.'],
+                'errors' => $errors,
                 'identifier' => $identifier,
             ]);
             return;
@@ -27,7 +27,7 @@ class AuthController extends Controller
         require_once __DIR__ . '/../models/User.php';
         $user = (new User())->findByUsername($identifier);
 
-        if (!$user || !password_verify($password, $user['Password'])) {
+        if (!Authorization::validCredentials($user, $password)) {
             $this->render('auth/login', [
                 'errors' => ['Invalid login identifier or password.'],
                 'identifier' => $identifier,
@@ -38,18 +38,13 @@ class AuthController extends Controller
         if (!session_regenerate_id(true)) {
             throw new RuntimeException('Unable to regenerate the session ID.');
         }
-        
+
         unset($user['Password']);
         $this->session->set('user', $user);
-        switch ((int) $user['RoleID']) {
-            case 1: // Admin
-            case 2: // Manager
-                header('Location: ?admin');
-                break;
-
-            default: // User
-                header('Location: ?bugs');
-                break;
+        if (Authorization::canManageProjects($user)) {
+            header('Location: ?admin');
+        } else {
+            header('Location: ?bugs');
         }
         exit;
     }

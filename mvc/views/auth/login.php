@@ -1,4 +1,8 @@
 <?php
+if (!isset($identifier)) {
+    $identifier = '';
+}
+
 // Submission 1 view placeholder: Display login identifier/password form and validation errors. AuthController supplies errors and safe entered values.
 $title = 'Login';
 include __DIR__ . '/../header.php';
@@ -19,7 +23,7 @@ include __DIR__ . '/../navigation.php';
         <div class="form-group">
             <label for="identifier">Login identifier</label>
             <input class="form-control" type="text" id="identifier" name="identifier"
-                   value="<?= htmlspecialchars((string) ($identifier ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>"
+                   value="<?= htmlspecialchars((string) $identifier, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>"
                    autocomplete="username" required>
         </div>
         <div class="form-group">

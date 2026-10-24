@@ -15,18 +15,22 @@ class Session {
     public static function getInstance() {
         if (self::$instance == null)
         {
-        self::$instance = new Session();
+            self::$instance = new Session();
         }
- 
+
         return self::$instance;
     }
 
     function get($name) {
-        return isset($_SESSION[$name]) ? $_SESSION[$name] : "";
+        if (isset($_SESSION[$name])) {
+            return $_SESSION[$name];
+        }
+
+        return "";
     }
 
     function set($name, $value) {
-        if ($name !== "" && isset($value)) { //$value can't be null
+        if ($name !== "" && isset($value)) {
             $_SESSION[$name] = $value;
         }
     }

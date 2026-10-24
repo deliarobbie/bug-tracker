@@ -10,10 +10,18 @@ include __DIR__ . '/../navigation.php';
     $escape = static function ($value) {
         return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     };
-    $projects = $projects ?? [];
-    $users = $allUsers ?? [];
-    $roles = $roles ?? [];
-    $isAdmin = (int) ($currentUser['RoleID'] ?? 0) === 1;
+    if (!isset($projects)) {
+        $projects = [];
+    }
+    if (isset($allUsers)) {
+        $users = $allUsers;
+    } else {
+        $users = [];
+    }
+    if (!isset($roles)) {
+        $roles = [];
+    }
+    $isAdmin = Authorization::canManageUsers($currentUser);
     $roleNames = [];
     foreach ($roles as $role) {
         $roleNames[$role['Id']] = $role['Role'];
@@ -53,8 +61,14 @@ include __DIR__ . '/../navigation.php';
                 <input type="hidden" name="id" value="<?= $escape($project['Id']) ?>">
                 <div class="form-group">
                     <label for="project-name-<?= $escape($index) ?>">Name</label>
+                    <?php
+                    $projectName = '';
+                    if (isset($project['Project'])) {
+                        $projectName = $project['Project'];
+                    }
+                    ?>
                     <input class="form-control" id="project-name-<?= $escape($index) ?>" name="name"
-                           type="text" value="<?= $escape($project['Project'] ?? '') ?>" maxlength="50" required>
+                           type="text" value="<?= $escape($projectName) ?>" maxlength="50" required>
                 </div>
                 <button class="btn btn-default" type="submit">Update project</button>
             </form>
@@ -109,15 +123,49 @@ include __DIR__ . '/../navigation.php';
                             <tr><td colspan="5">No users available.</td></tr>
                         <?php endif; ?>
                         <?php foreach ($users as $user): ?>
+                            <?php
+                            if (isset($user['RoleID'])) {
+                                $roleId = $user['RoleID'];
+                            } else {
+                                $roleId = '';
+                            }
+                            if (isset($roleNames[$roleId])) {
+                                $roleName = $roleNames[$roleId];
+                            } else {
+                                $roleName = $roleId;
+                            }
+                            if (isset($user['ProjectId'])) {
+                                $projectId = $user['ProjectId'];
+                            } else {
+                                $projectId = '';
+                            }
+                            if (isset($projectNames[$projectId])) {
+                                $projectName = $projectNames[$projectId];
+                            } else {
+                                $projectName = 'No project';
+                            }
+                            ?>
                             <tr>
-                                <td><?= $escape($user['Name'] ?? '') ?></td>
-                                <td><?= $escape($user['Username'] ?? '') ?></td>
-                                <td><?= $escape($roleNames[$user['RoleID']] ?? $user['RoleID'] ?? '') ?></td>
-                                <td><?= $escape($projectNames[$user['ProjectId'] ?? ''] ?? 'No project') ?></td>
+                                <?php
+                                $userName = '';
+                                if (isset($user['Name'])) {
+                                    $userName = $user['Name'];
+                                }
+                                ?>
+                                <td><?= $escape($userName) ?></td>
+                                <?php
+                                $username = '';
+                                if (isset($user['Username'])) {
+                                    $username = $user['Username'];
+                                }
+                                ?>
+                                <td><?= $escape($username) ?></td>
+                                <td><?= $escape($roleName) ?></td>
+                                <td><?= $escape($projectName) ?></td>
                                 <td>
                                     <form action="?user-delete" method="post">
                                         <input type="hidden" name="id" value="<?= $escape($user['Id']) ?>">
-                                        <button class="btn btn-danger" type="submit" aria-label="<?= $escape('Delete user ' . ($user['Username'] ?? '')) ?>">Delete</button>
+                                        <button class="btn btn-danger" type="submit" aria-label="<?= $escape('Delete user ' . ($username)) ?>">Delete</button>
                                     </form>
                                 </td>
                             </tr>

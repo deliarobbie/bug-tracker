@@ -10,14 +10,34 @@ include __DIR__ . '/../navigation.php';
     $escape = static function ($value) {
         return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     };
-    $bugs = $bugs ?? [];
-    $projects = $projects ?? [];
-    $users = $users ?? [];
-    $statuses = $statuses ?? [];
-    $priorities = $priorities ?? [];
-    $canAssign = $canAssign ?? $canManage;
-    $selectedProjectId = $selectedProjectId ?? ($currentUser['ProjectId'] ?? '');
-    $filter = $filter ?? 'all';
+    if (!isset($bugs)) {
+        $bugs = [];
+    }
+    if (!isset($projects)) {
+        $projects = [];
+    }
+    if (!isset($users)) {
+        $users = [];
+    }
+    if (!isset($statuses)) {
+        $statuses = [];
+    }
+    if (!isset($priorities)) {
+        $priorities = [];
+    }
+    if (!isset($canAssign)) {
+        $canAssign = $canManage;
+    }
+    if (!isset($selectedProjectId)) {
+        if (isset($currentUser['ProjectId'])) {
+            $selectedProjectId = $currentUser['ProjectId'];
+        } else {
+            $selectedProjectId = '';
+        }
+    }
+    if (!isset($filter)) {
+        $filter = 'all';
+    }
     $projectNames = [];
     foreach ($projects as $project) {
         $projectNames[$project['Id']] = $project['Project'];
@@ -43,7 +63,13 @@ include __DIR__ . '/../navigation.php';
         </ul></div>
     <?php endif; ?>
 
-    <p>Project: <?= $escape($projectNames[$selectedProjectId] ?? 'No project selected') ?></p>
+    <?php
+    $selectedProjectName = 'No project selected';
+    if (isset($projectNames[$selectedProjectId])) {
+        $selectedProjectName = $projectNames[$selectedProjectId];
+    }
+    ?>
+    <p>Project: <?= $escape(($selectedProjectName)) ?></p>
     <form action="" method="get" class="form-inline">
         <input type="hidden" name="bugs" value="">
         <?php if ($canManage): ?>
@@ -51,14 +77,14 @@ include __DIR__ . '/../navigation.php';
             <select class="form-control" id="filter-project" name="project_id">
                 <option value="">All projects</option>
                 <?php foreach ($projectNames as $id => $name): ?>
-                    <option value="<?= $escape($id) ?>" <?= (string) $selectedProjectId === (string) $id ? 'selected' : '' ?>><?= $escape($name) ?></option>
+                    <option value="<?= $escape($id) ?>" <?php if ((string) $selectedProjectId === (string) $id): ?>selected<?php endif; ?>><?= $escape($name) ?></option>
                 <?php endforeach; ?>
             </select>
         <?php endif; ?>
         <label for="bug-filter">Show</label>
         <select class="form-control" id="bug-filter" name="filter">
             <?php foreach (['all' => 'All bugs', 'open' => 'Open bugs', 'overdue' => 'Overdue bugs'] as $value => $label): ?>
-                <option value="<?= $escape($value) ?>" <?= $filter === $value ? 'selected' : '' ?>><?= $escape($label) ?></option>
+                <option value="<?= $escape($value) ?>" <?php if ($filter === $value): ?>selected<?php endif; ?>><?= $escape($label) ?></option>
             <?php endforeach; ?>
         </select>
         <button class="btn btn-default" type="submit">Apply filters</button>
@@ -74,14 +100,76 @@ include __DIR__ . '/../navigation.php';
                         <tr><td colspan="7">No bugs found.</td></tr>
                     <?php endif; ?>
                     <?php foreach ($bugs as $item): ?>
+                        <?php
+                        if (isset($item['projectId'])) {
+                            $projectId = $item['projectId'];
+                        } else {
+                            $projectId = '';
+                        }
+                        $projectName = '';
+                        if (isset($projectNames[$projectId])) {
+                            $projectName = $projectNames[$projectId];
+                        }
+                        if (isset($item['statusId'])) {
+                            $statusId = $item['statusId'];
+                        } else {
+                            $statusId = '';
+                        }
+                        if (isset($item['Status'])) {
+                            $statusName = $item['Status'];
+                        } else {
+                            $statusName = '';
+                        }
+                        if (isset($statusNames[$statusId])) {
+                            $statusName = $statusNames[$statusId];
+                        }
+                        if (isset($item['priorityId'])) {
+                            $priorityId = $item['priorityId'];
+                        } else {
+                            $priorityId = '';
+                        }
+                        if (isset($item['Priority'])) {
+                            $priorityName = $item['Priority'];
+                        } else {
+                            $priorityName = '';
+                        }
+                        if (isset($priorityNames[$priorityId])) {
+                            $priorityName = $priorityNames[$priorityId];
+                        }
+                        if (isset($item['assignedToId'])) {
+                            $assignedTo = $item['assignedToId'];
+                        } else {
+                            $assignedTo = '';
+                        }
+                        if (isset($item['Name'])) {
+                            $assigneeName = $item['Name'];
+                        } else {
+                            $assigneeName = 'Unassigned';
+                        }
+                        if (isset($userNames[$assignedTo])) {
+                            $assigneeName = $userNames[$assignedTo];
+                        }
+                        ?>
                         <tr>
-                            <td><a href="<?= $escape('?bug-details&id=' . rawurlencode((string) $item['Id'])) ?>"><?= $escape($item['Id']) ?></a></td>
-                            <td><?= $escape($item['Summary'] ?? '') ?></td>
-                            <td><?= $escape($projectNames[$item['ProjectId'] ?? ''] ?? '') ?></td>
-                            <td><?= $escape($statusNames[$item['StatusId'] ?? ''] ?? $item['Status'] ?? '') ?></td>
-                            <td><?= $escape($priorityNames[$item['PriorityId'] ?? ''] ?? $item['Priority'] ?? '') ?></td>
-                            <td><?= $escape($userNames[$item['AssignedTo'] ?? ''] ?? $item['AssignedToName'] ?? 'Unassigned') ?></td>
-                            <td><?= $escape($item['TargetDate'] ?? '') ?></td>
+                            <td><a href="<?= $escape('?bug-details&id=' . rawurlencode((string) $item['id'])) ?>"><?= $escape($item['id']) ?></a></td>
+                            <?php
+                            $summary = '';
+                            if (isset($item['summary'])) {
+                                $summary = $item['summary'];
+                            }
+                            ?>
+                            <td><?= $escape($summary) ?></td>
+                            <td><?= $escape($projectName) ?></td>
+                            <td><?= $escape($statusName) ?></td>
+                            <td><?= $escape($priorityName) ?></td>
+                            <td><?= $escape($assigneeName) ?></td>
+                            <?php
+                            $targetDate = '';
+                            if (isset($item['targetDate'])) {
+                                $targetDate = $item['targetDate'];
+                            }
+                            ?>
+                            <td><?= $escape($targetDate) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -94,18 +182,24 @@ include __DIR__ . '/../navigation.php';
         <form action="?bug-create" method="post">
             <div class="form-group">
                 <label for="new-summary">Summary (optional)</label>
-                <input class="form-control" id="new-summary" name="summary" type="text" maxlength="250" value="<?= $escape(is_string($_POST['summary'] ?? null) ? $_POST['summary'] : '') ?>">
+                <?php
+                $submittedSummary = Utils::stringValue($_POST, 'summary');
+                ?>
+                <input class="form-control" id="new-summary" name="summary" type="text" maxlength="250" value="<?= $escape($submittedSummary) ?>">
             </div>
             <div class="form-group">
                 <label for="new-description">Description (optional)</label>
-                <textarea class="form-control" id="new-description" name="description" rows="5" maxlength="2500"><?= $escape(is_string($_POST['description'] ?? null) ? $_POST['description'] : '') ?></textarea>
+                <?php
+                $submittedDescription = Utils::stringValue($_POST, 'description');
+                ?>
+                <textarea class="form-control" id="new-description" name="description" rows="5" maxlength="2500"><?= $escape($submittedDescription) ?></textarea>
             </div>
             <div class="form-group">
                 <label for="new-project">Project</label>
                 <select class="form-control" id="new-project" name="project_id" required>
                     <option value="">Select a project</option>
                     <?php foreach ($projectNames as $id => $name): ?>
-                        <option value="<?= $escape($id) ?>" <?= (string) $selectedProjectId === (string) $id ? 'selected' : '' ?>><?= $escape($name) ?></option>
+                        <option value="<?= $escape($id) ?>" <?php if ((string) $selectedProjectId === (string) $id): ?>selected<?php endif; ?>><?= $escape($name) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>

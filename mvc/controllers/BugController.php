@@ -1,27 +1,36 @@
 <?php
 
 require_once __DIR__ . '/../Controller.php';
-// handles bug actions 
-// bug list, details, creation, updates
-// checks login permissions, validates input calls bug move_uploaded_file
-// includes bug project retrieval from project model
-// Submission 1: intentional function shells. Database methods will use prepared statements.
+// Handles bug listing, details, creation, and updates with permission and input checks.
 class BugController extends Controller
 {
     public function index()
     {
         $user = $this->session->get('user');
-        if (!is_array($user)
-            || !in_array((int) ($user['RoleID'] ?? 0), [1, 2, 3], true)) {
+        if (!Authorization::canAccessBugs($user)) {
             echo 'Access denied.';
             return;
         }
 
-        $canManage = in_array((int) $user['RoleID'], [1, 2], true);
-        $projectId = $canManage
-            ? filter_var($_GET['project_id'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
-            : ($user['ProjectId'] ?? null);
-        $this->renderBugPage($user, $canManage, $projectId ?: '');
+        $canManage = Authorization::canAssignBugs($user);
+        if ($canManage) {
+            if (isset($_GET['project_id'])) {
+                $projectInput = $_GET['project_id'];
+            } else {
+                $projectInput = '';
+            }
+            $projectId = Utils::parseId($projectInput);
+        } else {
+            if (isset($user['ProjectId'])) {
+                $projectId = $user['ProjectId'];
+            } else {
+                $projectId = null;
+            }
+        }
+        if (!$projectId) {
+            $projectId = '';
+        }
+        $this->renderBugPage($user, $canManage, $projectId);
     }
 
     private function renderBugPage($user, $canManage, $projectId, $errors = [], $bug = null)
@@ -34,21 +43,27 @@ class BugController extends Controller
             $projects = $projectModel->findAll();
         } else {
             $project = $projectModel->findForUser($user['Id']);
-            $projects = $project ? [$project] : [];
+            if ($project) {
+                $projects = [$project];
+            } else {
+                $projects = [];
+            }
         }
 
-        $filter = $_GET['filter'] ?? 'all';
-        if (!in_array($filter, ['all', 'open', 'overdue'], true)) {
-            $filter = 'all';
+        $filter = Utils::bugFilter(Utils::value($_GET, 'filter', 'all'));
+        $bugs = [];
+        $view = 'bugs/details';
+        if (!$bug) {
+            $view = 'bugs/index';
+            $bugs = (new Bug())->findAllVisibleToUser($user, [
+                'project_id' => $projectId,
+                'filter' => $filter,
+            ]);
         }
-        $bugs = $bug ? [] : (new Bug())->findAllVisibleToUser($user, [
-            'project_id' => $projectId,
-            'filter' => $filter,
-        ]);
-        $priorties = (new Bug())->getPriorities();
+        $priorities = (new Bug())->getPriorities();
         $statuses = (new Bug())->getStatuses();
         $users = (new User())->findAll();
-        $this->render($bug ? 'bugs/details' : 'bugs/index', [
+        $this->render($view, [
             'currentUser' => $user,
             'canManage' => $canManage,
             'canAssign' => $canManage,
@@ -58,24 +73,28 @@ class BugController extends Controller
             'filter' => $filter,
             'errors' => $errors,
             'bug' => $bug,
-            'statuses' =>$statuses,
-            'priorities' => $priorties,
+            'statuses' => $statuses,
+            'priorities' => $priorities,
             'users' => $users
         ]);
     }
 
     public function details()
     {
-        $user = $this->authorizedUser();
+        $user = Authorization::requireLogin();
         if (!$user) {
             return;
         }
         try {
-            $bug = $this->loadVisibleBug($user, $_GET['id'] ?? '');
+            $idInput = '';
+            if (isset($_GET['id'])) {
+                $idInput = $_GET['id'];
+            }
+            $bug = $this->loadVisibleBug($user, $idInput);
             if (!$bug) {
                 return;
             }
-            $this->renderBugPage($user, $this->canManage($user), $bug['ProjectId'], [], $bug);
+            $this->renderBugPage($user, Authorization::canAssignBugs($user), $bug['projectId'], [], $bug);
         } catch (PDOException $e) {
             $this->databaseError($e);
         }
@@ -84,50 +103,23 @@ class BugController extends Controller
     public function create()
     {
         $user = $this->session->get('user');
-        if (!is_array($user)
-            || !in_array((int) ($user['RoleID'] ?? 0), [1, 2, 3], true)
-            || empty($user['Id'])) {
+        if (!Authorization::isLoggedIn($user) || !Authorization::canAccessBugs($user)) {
             echo 'Access denied.';
             return;
         }
-        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        if (!Utils::isPost()) {
             header('Allow: POST');
             return;
         }
 
-        $canAssign = in_array((int) $user['RoleID'], [1, 2], true);
-        $positiveId = static function ($value) {
-            return filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        };
-        $projectId = $positiveId($canAssign ? ($_POST['project_id'] ?? '') : ($user['ProjectId'] ?? ''));
-        $errors = [];
-        if (!$projectId) {
-            $errors[] = 'Select a valid project.';
-        }
-
-        $data = [
-            'projectId' => $projectId,
-            'ownerId' => $user['Id'],
-            'assignedToId' => null,
-            'targetDate' => null,
-            'priorityId' => null,
-            'dateClosed' => null,
-            'fixDescription' => null,
-        ];
-        foreach (['summary' => 250, 'description' => 2500] as $field => $limit) {
-            $value = $_POST[$field] ?? '';
-            $length = is_string($value) ? preg_match_all('/./us', $value) : false;
-            if ($length === false || $length > $limit) {
-                $errors[] = 'Enter a valid ' . $field . ' of at most ' . $limit . ' characters.';
-            } else {
-                $data[$field] = $value;
-            }
-        }
+        $canAssign = Authorization::canAssignBugs($user);
+        $errors = Utils::validateBugCreate($_POST, $user, $data);
+        $projectId = $data['projectId'];
         if (!$errors) {
             require_once __DIR__ . '/../models/Bug.php';
             try {
                 $model = new Bug();
-                $this->validateReferences($model, $data, $errors);
+                Utils::validateReferences($model, $data, $errors);
                 if (!$errors && $model->create($data)) {
                     header('Location: ?bugs');
                     return;
@@ -141,140 +133,77 @@ class BugController extends Controller
             }
         }
 
-        $this->renderBugPage($user, $canAssign, $projectId ?: '', $errors);
+        if (!$projectId) {
+            $projectId = '';
+        }
+        $this->renderBugPage($user, $canAssign, $projectId, $errors);
     }
 
     public function update()
     {
-        $user = $this->authorizedUser();
+        $user = Authorization::requireLogin();
         if (!$user) {
             return;
         }
-        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        if (!Utils::isPost()) {
             header('Allow: POST');
             return;
         }
         try {
-            $bug = $this->loadVisibleBug($user, $_POST['id'] ?? '');
+            $idInput = '';
+            if (isset($_POST['id'])) {
+                $idInput = $_POST['id'];
+            }
+            $bug = $this->loadVisibleBug($user, $idInput);
             if (!$bug) {
                 return;
             }
-            $canManage = $this->canManage($user);
-            if (!$canManage && (string) $bug['AssignedTo'] !== (string) $user['Id']) {
+            $canManage = Authorization::canAssignBugs($user);
+            if (!Authorization::canUpdateBug($user, $bug)) {
                 echo 'Access denied.';
                 return;
             }
-            $data = [
-                'assignedToId' => $bug['AssignedTo'],
-                'priorityId' => $bug['PriorityId'],
-                'targetDate' => $bug['TargetDate'],
-                'fixDescription' => $bug['Fix'],
-                'dateClosed' => $bug['ClosureDate'],
-            ];
-            $errors = [];
-            if (array_key_exists('fix', $_POST)) {
-                $fix = $_POST['fix'];
-                $length = is_string($fix) ? preg_match_all('/./us', $fix) : false;
-                if ($length === false || $length > 2500) {
-                    $errors[] = 'Enter a fix description of at most 2,500 characters.';
-                } else {
-                    $data['fixDescription'] = $fix;
-                }
-            }
-            if ($canManage) {
-                foreach (['assigned_to' => 'assignedToId', 'priority_id' => 'priorityId'] as $field => $key) {
-                    if (!array_key_exists($field, $_POST)) {
-                        continue;
-                    }
-                    $value = $_POST[$field];
-                    $data[$key] = $value === '' ? null : filter_var(
-                        $value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]
-                    );
-                    if ($data[$key] === false) {
-                        $errors[] = 'Select a valid ' . str_replace('_', ' ', $field) . '.';
-                    }
-                }
-            }
-            foreach (['closure_date' => 'dateClosed', 'target_date' => 'targetDate'] as $field => $key) {
-                if (($field === 'target_date' && !$canManage) || !array_key_exists($field, $_POST)) {
-                    continue;
-                }
-                $value = $_POST[$field];
-                if ($value === '') {
-                    $data[$key] = null;
-                    continue;
-                }
-                $date = is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value)
-                    ? DateTimeImmutable::createFromFormat('!Y-m-d', $value) : false;
-                if (!$date || $date->format('Y-m-d') !== $value) {
-                    $errors[] = 'Enter a valid ' . str_replace('_', ' ', $field) . '.';
-                } else {
-                    $data[$key] = $value;
-                }
-            }
+            $errors = Utils::validateBugUpdate($_POST, $bug, $canManage, $data);
             $model = new Bug();
             if (!$errors) {
-                $this->validateReferences($model, $data, $errors);
+                Utils::validateReferences($model, $data, $errors);
             }
             if (!$errors) {
-                if ($model->update($bug['Id'], $data)) {
-                    header('Location: ?bug-details&id=' . rawurlencode((string) $bug['Id']));
+                if ($model->update($bug['id'], $data)) {
+                    header('Location: ?bug-details&id=' . rawurlencode((string) $bug['id']));
                     return;
                 }
                 $errors[] = 'Unable to update bug.';
             }
-            foreach (['assignedToId' => 'AssignedTo', 'priorityId' => 'PriorityId', 'targetDate' => 'TargetDate',
-                      'fixDescription' => 'Fix', 'dateClosed' => 'ClosureDate'] as $key => $alias) {
-                if ($data[$key] !== false) {
-                    $bug[$alias] = $data[$key];
+            foreach (['assignedToId', 'priorityId', 'targetDate', 'fixDescription', 'dateClosed'] as $field) {
+                if ($data[$field] !== false) {
+                    $bug[$field] = $data[$field];
                 }
             }
-            $this->renderBugPage($user, $canManage, $bug['ProjectId'], $errors, $bug);
+            $this->renderBugPage($user, $canManage, $bug['projectId'], $errors, $bug);
         } catch (PDOException $e) {
             $this->databaseError($e);
         }
     }
 
-    private function canManage($user)
-    {
-        return in_array((int) $user['RoleID'], [1, 2], true);
-    }
-
-    private function authorizedUser()
-    {
-        $user = $this->session->get('user');
-        if (!is_array($user) || empty($user['Id'])
-            || !in_array((int) ($user['RoleID'] ?? 0), [1, 2, 3], true)) {
-            echo 'Access denied.';
-            return false;
-        }
-        return $user;
-    }
-
     private function loadVisibleBug($user, $id)
     {
-        $id = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $id = Utils::parseId($id);
         require_once __DIR__ . '/../models/Bug.php';
-        $bug = $id ? (new Bug())->findById($id) : false;
+        if ($id) {
+            $bug = (new Bug())->findById($id);
+        } else {
+            $bug = false;
+        }
         if (!$bug) {
             echo 'Bug not found.';
             return false;
         }
-        if (!$this->canManage($user)
-            && (string) $bug['ProjectId'] !== (string) ($user['ProjectId'] ?? '')) {
+        if (!Authorization::canViewBug($user, $bug)) {
             echo 'Access denied.';
             return false;
         }
         return $bug;
-    }
-
-    private function validateReferences($model, $data, &$errors)
-    {
-        foreach (['projectId' => 'project', 'assignedToId' => 'user_details', 'priorityId' => 'priority'] as $key => $table) {
-            if (isset($data[$key]) && !$model->referenceExists($table, $data[$key])) {
-                $errors[] = 'Select a valid ' . ['projectId' => 'project', 'assignedToId' => 'assignee', 'priorityId' => 'priority'][$key] . '.';
-            }
-        }
     }
 
     private function databaseError($e)

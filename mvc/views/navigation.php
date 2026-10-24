@@ -1,10 +1,21 @@
 <?php
 require_once __DIR__ . '/../utils/Session.php';
+require_once __DIR__ . '/../utils/Authorization.php';
 
 $currentUser = Session::getInstance()->get('user');
-$isLoggedIn = is_array($currentUser) && !empty($currentUser['Id']);
-$canManage = $isLoggedIn
-    && in_array((int) ($currentUser['RoleID'] ?? 0), [1, 2], true);
+$isLoggedIn = Authorization::isLoggedIn($currentUser);
+$canManage = $isLoggedIn && Authorization::canManageProjects($currentUser);
+$homeRoute = '?login';
+if ($isLoggedIn) {
+    $homeRoute = '?bugs';
+    if ($canManage) {
+        $homeRoute = '?admin';
+    }
+}
+$displayName = '';
+if (isset($currentUser['Name'])) {
+    $displayName = $currentUser['Name'];
+}
 ?>
 
 <nav class="navbar navbar-inverse" aria-label="Main navigation">
@@ -23,7 +34,7 @@ $canManage = $isLoggedIn
             </button>
 
             <a class="navbar-brand"
-               href="<?= $isLoggedIn ? ($canManage ? '?admin' : '?bugs') : '?login' ?>">
+               href="<?= $homeRoute ?>">
                 Bug Tracker
             </a>
         </div>
@@ -42,7 +53,7 @@ $canManage = $isLoggedIn
                     <li>
                         <p class="navbar-text">
                             <?= htmlspecialchars(
-                                (string) ($currentUser['Name'] ?? ''),
+                                (string) $displayName,
                                 ENT_QUOTES | ENT_SUBSTITUTE,
                                 'UTF-8'
                             ) ?>

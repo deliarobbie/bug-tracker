@@ -9,11 +9,21 @@ include __DIR__ . '/../navigation.php';
     $escape = static function ($value) {
         return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     };
-    $projects = $projects ?? [];
-    $users = $users ?? [];
-    $statuses = $statuses ?? [];
-    $priorities = $priorities ?? [];
-    $canAssign = $canAssign ?? $canManage;
+    if (!isset($projects)) {
+        $projects = [];
+    }
+    if (!isset($users)) {
+        $users = [];
+    }
+    if (!isset($statuses)) {
+        $statuses = [];
+    }
+    if (!isset($priorities)) {
+        $priorities = [];
+    }
+    if (!isset($canAssign)) {
+        $canAssign = $canManage;
+    }
     $projectNames = [];
     foreach ($projects as $project) {
         $projectNames[$project['Id']] = $project['Project'];
@@ -41,45 +51,127 @@ include __DIR__ . '/../navigation.php';
 
     <p><a href="?bugs">Back to bugs</a></p>
     <?php if (!empty($bug)): ?>
+        <?php
+        if (isset($bug['projectId'])) {
+            $projectId = $bug['projectId'];
+        } else {
+            $projectId = '';
+        }
+        $projectName = '';
+        if (isset($projectNames[$projectId])) {
+            $projectName = $projectNames[$projectId];
+        }
+        if (isset($bug['ownerId'])) {
+            $ownerId = $bug['ownerId'];
+        } else {
+            $ownerId = '';
+        }
+        $ownerName = '';
+        if (isset($userNames[$ownerId])) {
+            $ownerName = $userNames[$ownerId];
+        }
+        if (isset($bug['statusId'])) {
+            $statusId = $bug['statusId'];
+        } else {
+            $statusId = '';
+        }
+        if (isset($bug['Status'])) {
+            $statusName = $bug['Status'];
+        } else {
+            $statusName = '';
+        }
+        if (isset($statusNames[$statusId])) {
+            $statusName = $statusNames[$statusId];
+        }
+        if (isset($bug['priorityId'])) {
+            $priorityId = $bug['priorityId'];
+        } else {
+            $priorityId = '';
+        }
+        if (isset($bug['Priority'])) {
+            $priorityName = $bug['Priority'];
+        } else {
+            $priorityName = '';
+        }
+        if (isset($priorityNames[$priorityId])) {
+            $priorityName = $priorityNames[$priorityId];
+        }
+        if (isset($bug['assignedToId'])) {
+            $assignedTo = $bug['assignedToId'];
+        } else {
+            $assignedTo = '';
+        }
+        $assigneeName = 'Unassigned';
+        if (isset($userNames[$assignedTo])) {
+            $assigneeName = $userNames[$assignedTo];
+        }
+        ?>
         <section class="bug-details-card" aria-labelledby="bug-details-heading">
-            <h2 id="bug-details-heading">Bug #<?= $escape($bug['Id']) ?></h2>
+            <h2 id="bug-details-heading">Bug #<?= $escape($bug['id']) ?></h2>
             <dl class="bug-details-list">
-                <?php foreach (['Id' => 'ID', 'Summary' => 'Summary', 'Description' => 'Description', 'DateRaised' => 'Date raised', 'TargetDate' => 'Target date', 'ClosureDate' => 'Closure date', 'Fix' => 'Fix'] as $field => $label): ?>
-                    <dt><?= $escape($label) ?></dt><dd><?= $escape($bug[$field] ?? '') ?></dd>
+                <?php foreach (['id' => 'ID', 'summary' => 'Summary', 'description' => 'Description', 'dateRaised' => 'Date raised', 'targetDate' => 'Target date', 'dateClosed' => 'Closure date', 'fixDescription' => 'Fix'] as $field => $label): ?>
+                    <?php
+                    $fieldValue = '';
+                    if (isset($bug[$field])) {
+                        $fieldValue = $bug[$field];
+                    }
+                    ?>
+                    <dt><?= $escape($label) ?></dt><dd><?= $escape($fieldValue) ?></dd>
                 <?php endforeach; ?>
-                <dt>Project</dt><dd><?= $escape($projectNames[$bug['ProjectId'] ?? ''] ?? '') ?></dd>
-                <dt>Raised by</dt><dd><?= $escape($userNames[$bug['OwnerId'] ?? ''] ?? '') ?></dd>
-                <dt>Status</dt><dd><?= $escape($statusNames[$bug['StatusId'] ?? ''] ?? $bug['Status'] ?? '') ?></dd>
-                <dt>Priority</dt><dd><?= $escape($priorityNames[$bug['PriorityId'] ?? ''] ?? $bug['Priority'] ?? '') ?></dd>
-                <dt>Assigned to</dt><dd><?= $escape($userNames[$bug['AssignedTo'] ?? ''] ?? 'Unassigned') ?></dd>
+                <dt>Project</dt><dd><?= $escape($projectName) ?></dd>
+                <dt>Raised by</dt><dd><?= $escape($ownerName) ?></dd>
+                <dt>Status</dt><dd><?= $escape($statusName) ?></dd>
+                <dt>Priority</dt><dd><?= $escape($priorityName) ?></dd>
+                <dt>Assigned to</dt><dd><?= $escape($assigneeName) ?></dd>
             </dl>
-            <?php if ($canUpdate ?? ($canManage || (!empty($currentUser['Id']) && (string) ($bug['AssignedTo'] ?? '') === (string) $currentUser['Id']))): ?>
+            <?php
+            if (!isset($canUpdate)) {
+                $canUpdate = Authorization::canUpdateBug($currentUser, $bug);
+            }
+            ?>
+            <?php if ($canUpdate): ?>
                 <form class="bug-update-form" action="?bug-update" method="post" aria-labelledby="update-bug-heading">
                     <h3 id="update-bug-heading">Update bug</h3>
-                    <input type="hidden" name="id" value="<?= $escape($bug['Id']) ?>">
-                    <?php foreach (['fix' => ['Fix', 'Fix']] as $field => $settings): ?>
-                        <div class="form-group">
-                            <label for="update-<?= $escape($field) ?>"><?= $escape($settings[0]) ?></label>
-                            <textarea class="form-control" id="update-<?= $escape($field) ?>" name="<?= $escape($field) ?>" rows="3" <?= $field !== 'fix' ? 'required' : '' ?>><?= $escape($bug[$settings[1]] ?? '') ?></textarea>
-                        </div>
-                    <?php endforeach; ?>
-                    <?php foreach (['priority_id' => ['Priority', $priorityNames, 'PriorityId'], 'assigned_to' => ['Assigned to', $userNames, 'AssignedTo']] as $field => $settings): ?>
+                    <input type="hidden" name="id" value="<?= $escape($bug['id']) ?>">
+                    <div class="form-group">
+                        <label for="update-fix">Fix</label>
+                        <?php
+                        $fixDescription = '';
+                        if (isset($bug['fixDescription'])) {
+                            $fixDescription = $bug['fixDescription'];
+                        }
+                        ?>
+                        <textarea class="form-control" id="update-fix" name="fix" rows="3"><?= $escape($fixDescription) ?></textarea>
+                    </div>
+                    <?php foreach (['priority_id' => ['Priority', $priorityNames, 'priorityId'], 'assigned_to' => ['Assigned to', $userNames, 'assignedToId']] as $field => $settings): ?>
                         <?php if (!$canAssign) { continue; } ?>
                         <div class="form-group">
                             <label for="update-<?= $escape($field) ?>"><?= $escape($settings[0]) ?></label>
                             <select class="form-control" id="update-<?= $escape($field) ?>" name="<?= $escape($field) ?>">
                                 <option value="">None</option>
                                 <?php foreach ($settings[1] as $id => $label): ?>
-                                    <option value="<?= $escape($id) ?>" <?= (string) ($bug[$settings[2]] ?? '') === (string) $id ? 'selected' : '' ?>><?= $escape($label) ?></option>
+                                    <?php
+                                    $selectedValue = '';
+                                    if (isset($bug[$settings[2]])) {
+                                        $selectedValue = $bug[$settings[2]];
+                                    }
+                                    ?>
+                                    <option value="<?= $escape($id) ?>" <?php if ((string) ($selectedValue) === (string) $id): ?>selected<?php endif; ?>><?= $escape($label) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                     <?php endforeach; ?>
-                    <?php foreach (['target_date' => ['Target date', 'TargetDate'], 'closure_date' => ['Closure date', 'ClosureDate']] as $field => $settings): ?>
+                    <?php foreach (['target_date' => ['Target date', 'targetDate'], 'closure_date' => ['Closure date', 'dateClosed']] as $field => $settings): ?>
                         <?php if ($field === 'target_date' && !$canAssign) { continue; } ?>
                         <div class="form-group">
                             <label for="update-<?= $escape($field) ?>"><?= $escape($settings[0]) ?></label>
-                            <input class="form-control" id="update-<?= $escape($field) ?>" name="<?= $escape($field) ?>" type="date" value="<?= $escape(substr((string) ($bug[$settings[1]] ?? ''), 0, 10)) ?>">
+                            <?php
+                            $dateValue = '';
+                            if (isset($bug[$settings[1]])) {
+                                $dateValue = $bug[$settings[1]];
+                            }
+                            ?>
+                            <input class="form-control" id="update-<?= $escape($field) ?>" name="<?= $escape($field) ?>" type="date" value="<?= $escape(substr((string) ($dateValue), 0, 10)) ?>">
                         </div>
                     <?php endforeach; ?>
                     <button class="btn btn-primary" type="submit">Update bug</button>
