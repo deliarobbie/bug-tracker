@@ -30,6 +30,15 @@ class Authorization
             echo 'Access denied.';
             return false;
         }
+        // refresh the project so admin assignment changes apply on the next request
+        require_once __DIR__ . '/../models/User.php';
+        $user = (new User())->findById($user['Id']);
+        if (!self::isLoggedIn($user) || !self::canAccessBugs($user)) {
+            Session::getInstance()->set('user', []);
+            echo 'Access denied.';
+            return false;
+        }
+        Session::getInstance()->set('user', $user);
         return $user;
     }
 

@@ -17,6 +17,7 @@ $router->addRoute('logout', 'AuthController', 'logout');
 $router->addRoute('admin', 'AdminController', 'index');
 $router->addRoute('user-create', 'AdminController', 'createUser');
 $router->addRoute('user-delete', 'AdminController', 'deleteUser');
+$router->addRoute('user-project', 'AdminController', 'assignProject');
 $router->addRoute('project-create', 'AdminController', 'createProject');
 $router->addRoute('project-update', 'AdminController', 'updateProject');
 $router->addRoute('bugs', 'BugController', 'index');

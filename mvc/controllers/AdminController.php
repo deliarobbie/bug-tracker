@@ -51,6 +51,37 @@ class AdminController extends Controller
         $this->renderAdmin($errors);
     }
 
+    public function assignProject()
+    {
+        $user = $this->session->get('user');
+        if (!Authorization::canManageUsers($user)) {
+            echo 'Access denied.';
+            return;
+        }
+        if (!Utils::isPost()) {
+            header('Allow: POST');
+            return;
+        }
+
+        require_once __DIR__ . '/../models/User.php';
+        require_once __DIR__ . '/../models/Project.php';
+        try {
+            $userModel = new User();
+            $errors = Utils::validateProjectAssignment($_POST, $userModel, new Project(), $data);
+            if (!$errors) {
+                if ($userModel->assignProject($data['id'], $data['project_id'])) {
+                    header('Location: ?admin');
+                    return;
+                }
+                $errors[] = 'Unable to update project assignment.';
+            }
+        } catch (PDOException $e) {
+            error_log($e->getMessage());
+            $errors = ['Unable to update project assignment.'];
+        }
+        $this->renderAdmin($errors);
+    }
+
     private function renderAdmin($errors = [])
     {
         require_once __DIR__ . '/../models/User.php';

@@ -161,7 +161,23 @@ include __DIR__ . '/../navigation.php';
                                 ?>
                                 <td><?= $escape($username) ?></td>
                                 <td><?= $escape($roleName) ?></td>
-                                <td><?= $escape($projectName) ?></td>
+                                <td>
+                                    <?php if ((int) $roleId === 3): ?>
+                                        <form action="?user-project" method="post">
+                                            <input type="hidden" name="id" value="<?= $escape($user['Id']) ?>">
+                                            <label for="assigned-project-<?= $escape($user['Id']) ?>">Project for <?= $escape($username) ?></label>
+                                            <select class="form-control" id="assigned-project-<?= $escape($user['Id']) ?>" name="project_id">
+                                                <option value="">No project</option>
+                                                <?php foreach ($projectNames as $assignmentId => $assignmentName): ?>
+                                                    <option value="<?= $escape($assignmentId) ?>" <?php if ((string) $projectId === (string) $assignmentId): ?>selected<?php endif; ?>><?= $escape($assignmentName) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <button class="btn btn-default" type="submit">Save project</button>
+                                        </form>
+                                    <?php else: ?>
+                                        <?= $escape($projectName) ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <form action="?user-delete" method="post">
                                         <input type="hidden" name="id" value="<?= $escape($user['Id']) ?>">

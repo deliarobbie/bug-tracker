@@ -6,9 +6,8 @@ class BugController extends Controller
 {
     public function index()
     {
-        $user = $this->session->get('user');
-        if (!Authorization::canAccessBugs($user)) {
-            echo 'Access denied.';
+        $user = Authorization::requireLogin();
+        if (!$user) {
             return;
         }
 
@@ -94,7 +93,9 @@ class BugController extends Controller
             if (!$bug) {
                 return;
             }
-            $this->renderBugPage($user, Authorization::canAssignBugs($user), $bug['ProjectId'], [], $bug);
+            // var_dump($bug);
+            // exit;
+            $this->renderBugPage($user, Authorization::canAssignBugs($user), $bug['projectId'], [], $bug);
         } catch (PDOException $e) {
             $this->databaseError($e);
         }
@@ -102,9 +103,8 @@ class BugController extends Controller
 
     public function create()
     {
-        $user = $this->session->get('user');
-        if (!Authorization::isLoggedIn($user) || !Authorization::canAccessBugs($user)) {
-            echo 'Access denied.';
+        $user = Authorization::requireLogin();
+        if (!$user) {
             return;
         }
         if (!Utils::isPost()) {
@@ -169,19 +169,18 @@ class BugController extends Controller
                 Utils::validateReferences($model, $data, $errors);
             }
             if (!$errors) {
-                if ($model->update($bug['Id'], $data)) {
-                    header('Location: ?bug-details&id=' . rawurlencode((string) $bug['Id']));
+                if ($model->update($bug['id'], $data)) {
+                    header('Location: ?bug-details&id=' . rawurlencode((string) $bug['id']));
                     return;
                 }
                 $errors[] = 'Unable to update bug.';
             }
-            foreach (['assignedToId' => 'AssignedTo', 'priorityId' => 'PriorityId', 'targetDate' => 'TargetDate',
-                      'fixDescription' => 'Fix', 'dateClosed' => 'ClosureDate'] as $key => $alias) {
-                if ($data[$key] !== false) {
-                    $bug[$alias] = $data[$key];
+            foreach (['assignedToId', 'priorityId', 'targetDate', 'fixDescription', 'dateClosed'] as $field) {
+                if ($data[$field] !== false) {
+                    $bug[$field] = $data[$field];
                 }
             }
-            $this->renderBugPage($user, $canManage, $bug['ProjectId'], $errors, $bug);
+            $this->renderBugPage($user, $canManage, $bug['projectId'], $errors, $bug);
         } catch (PDOException $e) {
             $this->databaseError($e);
         }

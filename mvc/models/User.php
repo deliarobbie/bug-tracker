@@ -13,7 +13,11 @@ class User extends DB {
     }
 
     public function findById($id) {
-        // TODO: Retrieve an existing user using a prepared statement.
+        $stmt = $this->dbh->prepare(
+            'SELECT Id, Username, RoleID, ProjectId, Name FROM user_details WHERE Id = :id'
+        );
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     public function findByUsername($username) {
@@ -61,7 +65,11 @@ class User extends DB {
     }
 
     public function assignProject($userId, $projectId) {
-        // TODO: Allow one project for a User, none for Admins/Managers.
+        // only regular users can have a project assignment
+        $stmt = $this->dbh->prepare(
+            'UPDATE user_details SET ProjectId = :projectId WHERE Id = :id AND RoleID = :roleId'
+        );
+        return $stmt->execute(['projectId' => $projectId, 'id' => $userId, 'roleId' => 3]);
     }
 
     public function deleteAndClearAssignments($id) {

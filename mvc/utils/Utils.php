@@ -172,6 +172,35 @@ class Utils
         return $errors;
     }
 
+    // checks the user and project exist before changing an assignment
+    public static function validateProjectAssignment($input, $userModel, $projectModel, &$data = [])
+    {
+        $data = ['id' => self::parseId(self::value($input, 'id')), 'project_id' => null];
+        $projectInput = self::value($input, 'project_id');
+        if ($projectInput !== '') {
+            $data['project_id'] = self::parseId($projectInput);
+        }
+
+        $errors = [];
+        if ($data['id'] === false) {
+            $errors[] = 'Select a valid user.';
+        } else {
+            $user = $userModel->findById($data['id']);
+            if (!$user) {
+                $errors[] = 'Select a valid user.';
+            } elseif (!Authorization::hasRole($user, [3])) {
+                $errors[] = 'Only Users may have a project assignment.';
+            }
+        }
+
+        if ($data['project_id'] === false) {
+            $errors[] = 'Select a valid project.';
+        } elseif ($data['project_id'] !== null && !$projectModel->findById($data['project_id'])) {
+            $errors[] = 'Select a valid project.';
+        }
+        return $errors;
+    }
+
     // checks the username is not already taken
     public static function validateUserReferences($model, $data)
     {
